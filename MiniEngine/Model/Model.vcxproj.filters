@@ -51,6 +51,9 @@
     <Filter Include="Shaders">
       <UniqueIdentifier>{9169b7c9-f1a7-41d4-9098-58de36da850c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders\transfer_matrix">
+      <UniqueIdentifier>{1df0dd55-587a-4095-85ed-093ed7414984}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="SponzaRenderer.h">
@@ -110,6 +113,15 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="packages.config" />
+    <None Include="Shaders\transfer_matrix\tm2.hlsli">
+      <Filter>Shaders\transfer_matrix</Filter>
+    </None>
+    <None Include="Shaders\transfer_matrix\HenyeyGreenstein.hlsli">
+      <Filter>Shaders\transfer_matrix</Filter>
+    </None>
+    <None Include="Shaders\transfer_matrix\MatrixOperators.hlsli">
+      <Filter>Shaders\transfer_matrix</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\DefaultVS.hlsl">
@@ -192,6 +204,9 @@
     </FxCompile>
     <FxCompile Include="Shaders\DefaultNoUV1SkinVS.hlsl">
       <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="Shaders\transfer_matrix\TM2DielectricPS.hlsl">
+      <Filter>Shaders\transfer_matrix</Filter>
     </FxCompile>
   </ItemGroup>
 </Project>

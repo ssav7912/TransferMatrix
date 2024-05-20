@@ -57,6 +57,9 @@
     <Manifest>
       <EnableDPIAwareness>true</EnableDPIAwareness>
     </Manifest>
+    <FxCompile>
+      <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Solution_Dir)..\Model\Shaders\</AdditionalIncludeDirectories>
+    </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Animation.h" />
@@ -96,6 +99,9 @@
     <None Include="Shaders\FillLightGridCS.hlsli" />
     <None Include="Shaders\LightGrid.hlsli" />
     <None Include="Shaders\Lighting.hlsli" />
+    <None Include="Shaders\transfer_matrix\HenyeyGreenstein.hlsli" />
+    <None Include="Shaders\transfer_matrix\MatrixOperators.hlsli" />
+    <None Include="Shaders\transfer_matrix\tm2.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\CutoutDepthPS.hlsl">
@@ -170,6 +176,11 @@
     </FxCompile>
     <FxCompile Include="Shaders\SkyboxVS.hlsl">
       <ShaderType>Vertex</ShaderType>
+    </FxCompile>
+    <FxCompile Include="Shaders\transfer_matrix\TM2DielectricPS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

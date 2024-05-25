@@ -102,6 +102,7 @@
     <None Include="Shaders\transfer_matrix\HenyeyGreenstein.hlsli" />
     <None Include="Shaders\transfer_matrix\MatrixOperators.hlsli" />
     <None Include="Shaders\transfer_matrix\tm2.hlsli" />
+    <None Include="tensor3d.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\CutoutDepthPS.hlsl">

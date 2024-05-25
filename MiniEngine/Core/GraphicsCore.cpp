@@ -31,6 +31,7 @@
 #include "GraphRenderer.h"
 #include "TemporalEffects.h"
 #include "Display.h"
+#include <d3d12sdklayers.h>
 
 #pragma comment(lib, "d3d12.lib") 
 
@@ -353,7 +354,7 @@ void Graphics::Initialize(bool RequireDXRSupport)
             D3D12_MESSAGE_ID_RESOURCE_BARRIER_DUPLICATE_SUBRESOURCE_TRANSITIONS,
 
             // Suppress errors from calling ResolveQueryData with timestamps that weren't requested on a given frame.
-            D3D12_MESSAGE_ID_RESOLVE_QUERY_INVALID_QUERY_STATE,
+            //D3D12_MESSAGE_ID_RESOLVE_QUERY_INVALID_QUERY_STATE,
         };
 
         D3D12_INFO_QUEUE_FILTER NewFilter = {};

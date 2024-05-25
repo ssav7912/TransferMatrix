@@ -1,4 +1,6 @@
 
+#pragma once
+
 static const float PI = 3.14159265f;
 
 
@@ -37,6 +39,11 @@ float hg_to_ggx(float asymmetry)
     asymmetry = clamp(asymmetry,-1.0f, 1.0f);
     return clamp(0.5f * pow((1.085f) / (max(asymmetry, 0.2f) + 0.085f) - 1.0f, 1.0f / 1.3f), 1e-4f, 1.f);
 
+}
+
+float hg_refract(float asymmetry, float ior)
+{
+    return min(sqrt(max(1.0f - (1.0f - asymmetry * asymmetry) * pow(ior, 0.75f), 0.0f)), 1.0f);
 }
 
 //equation 16

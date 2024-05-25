@@ -122,6 +122,9 @@
     <None Include="Shaders\transfer_matrix\MatrixOperators.hlsli">
       <Filter>Shaders\transfer_matrix</Filter>
     </None>
+    <None Include="tensor3d.hlsli">
+      <Filter>Shaders\transfer_matrix</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\DefaultVS.hlsl">

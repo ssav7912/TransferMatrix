@@ -17,35 +17,35 @@
 #include <mutex>
 #include <zlib.h> // From NuGet package 
 
-using namespace std;
+//using namespace std;
 using namespace Utility;
 
 namespace Utility
 {
-    ByteArray NullFile = make_shared<vector<byte> > (vector<byte>() );
+    ByteArray NullFile = std::make_shared<std::vector<byte> > (std::vector<byte>() );
 }
 
-ByteArray DecompressZippedFile( wstring& fileName );
+ByteArray DecompressZippedFile( std::wstring& fileName );
 
-ByteArray ReadFileHelper(const wstring& fileName)
+ByteArray ReadFileHelper(const std::wstring& fileName)
 {
     struct _stat64 fileStat;
     int fileExists = _wstat64(fileName.c_str(), &fileStat);
     if (fileExists == -1)
         return NullFile;
 
-    ifstream file( fileName, ios::in | ios::binary );
+    std::ifstream file( fileName, std::ios::in | std::ios::binary );
     if (!file)
         return NullFile;
 
-    Utility::ByteArray byteArray = make_shared<vector<byte> >( fileStat.st_size );
+    Utility::ByteArray byteArray = std::make_shared<std::vector<byte> >( fileStat.st_size );
     file.read( (char*)byteArray->data(), byteArray->size() );
     file.close();
 
     return byteArray;
 }
 
-ByteArray ReadFileHelperEx( shared_ptr<wstring> fileName)
+ByteArray ReadFileHelperEx( std::shared_ptr<std::wstring> fileName)
 {
     std::wstring zippedFileName = *fileName + L".gz";
     ByteArray firstTry = DecompressZippedFile(zippedFileName);
@@ -58,7 +58,7 @@ ByteArray ReadFileHelperEx( shared_ptr<wstring> fileName)
 ByteArray Inflate(ByteArray CompressedSource, int& err, uint32_t ChunkSize = 0x100000 ) 
 {
     // Create a dynamic buffer to hold compressed blocks
-    vector<unique_ptr<byte> > blocks;
+    std::vector<std::unique_ptr<byte> > blocks;
 
     z_stream strm  = {};
     strm.data_type = Z_BINARY;
@@ -83,7 +83,7 @@ ByteArray Inflate(ByteArray CompressedSource, int& err, uint32_t ChunkSize = 0x1
 
     ASSERT(strm.total_out > 0, "Nothing to decompress");
 
-    Utility::ByteArray byteArray = make_shared<vector<byte> >( strm.total_out );
+    Utility::ByteArray byteArray = std::make_shared<std::vector<byte> >( strm.total_out );
 
     // Allocate actual memory for this.
     // copy the bits into that RAM.
@@ -107,7 +107,7 @@ ByteArray Inflate(ByteArray CompressedSource, int& err, uint32_t ChunkSize = 0x1
     return byteArray;
 }
 
-ByteArray DecompressZippedFile( wstring& fileName )
+ByteArray DecompressZippedFile( std::wstring& fileName )
 {
     ByteArray CompressedFile = ReadFileHelper(fileName);
     if (CompressedFile == NullFile)
@@ -124,13 +124,13 @@ ByteArray DecompressZippedFile( wstring& fileName )
     return DecompressedFile;
 }
 
-ByteArray Utility::ReadFileSync( const wstring& fileName)
+ByteArray Utility::ReadFileSync( const std::wstring& fileName)
 {
-    return ReadFileHelperEx(make_shared<wstring>(fileName));
+    return ReadFileHelperEx(std::make_shared<std::wstring>(fileName));
 }
 
-task<ByteArray> Utility::ReadFileAsync(const wstring& fileName)
+task<ByteArray> Utility::ReadFileAsync(const std::wstring& fileName)
 {
-    shared_ptr<wstring> SharedPtr = make_shared<wstring>(fileName);
+    std::shared_ptr<std::wstring> SharedPtr = std::make_shared<std::wstring>(fileName);
     return create_task( [=] { return ReadFileHelperEx(SharedPtr); } );
 }

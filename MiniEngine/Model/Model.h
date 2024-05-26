@@ -46,6 +46,7 @@ namespace PSOFlags
         kAlphaTest      = 0x040,
         kTwoSided       = 0x080,
         kHasSkin        = 0x100,  // Implies having indices and weights
+        kUseTM2         = 0x200, //Request the TM2 PSO.
     };
 }
 

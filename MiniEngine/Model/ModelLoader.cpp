@@ -20,6 +20,7 @@
 #include "glTF.h"
 #include "ModelH3D.h"
 #include "TextureManager.h"
+#include "Texture.h"
 #include "TextureConvert.h"
 #include "GraphicsCommon.h"
 
@@ -56,7 +57,8 @@ void LoadMaterials(Model& model,
         CompileTextureOnDemand(originalFile, textureOptions[ti]);
 
         std::wstring ddsFile = Utility::RemoveExtension(originalFile) + L".dds";
-        model.textures[ti] = TextureManager::LoadDDSFromFile(ddsFile);
+        auto dds = TextureManager::LoadDDSFromFile(ddsFile);
+        model.textures[ti] = dds;
     }
 
     // Generate descriptor tables and record offsets for each material

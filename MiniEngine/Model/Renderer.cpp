@@ -11,6 +11,8 @@
 // Author:   James Stanard
 //
 
+#include <filesystem>
+
 #include "Renderer.h"
 #include "Model.h"
 #include "TextureManager.h"
@@ -21,6 +23,8 @@
 #include "../Core/GraphicsCommon.h"
 #include "../Core/BufferManager.h"
 #include "../Core/ShadowCamera.h"
+
+#include "../TransferMatrix/TM2Resources.h"
 
 #include "CompiledShaders/DefaultVS.h"
 #include "CompiledShaders/DefaultSkinVS.h"
@@ -68,12 +72,17 @@ namespace Renderer
     RootSignature m_RootSig;
     GraphicsPSO m_SkyboxPSO(L"Renderer: Skybox PSO");
     GraphicsPSO m_DefaultPSO(L"Renderer: Default PSO"); // Not finalized.  Used as a template.
+    TM2Resources transfer_matrix;
 
     DescriptorHandle m_CommonTextures;
 }
 
 void Renderer::Initialize(void)
 {
+    ///TM2 PSOs
+    transfer_matrix.Initialise("FGD.dds", "tm_TIR.bin");
+
+
     if (s_Initialized)
         return;
 
@@ -91,7 +100,7 @@ void Renderer::Initialize(void)
     m_RootSig[kMaterialConstants].InitAsConstantBuffer(0, D3D12_SHADER_VISIBILITY_PIXEL);
     m_RootSig[kMaterialSRVs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, 10, D3D12_SHADER_VISIBILITY_PIXEL);
     m_RootSig[kMaterialSamplers].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 0, 10, D3D12_SHADER_VISIBILITY_PIXEL);
-    m_RootSig[kCommonSRVs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 10, 10, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_RootSig[kCommonSRVs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 10, 12, D3D12_SHADER_VISIBILITY_PIXEL);
     m_RootSig[kCommonCBV].InitAsConstantBuffer(1);
     m_RootSig[kSkinMatrices].InitAsBufferSRV(20, D3D12_SHADER_VISIBILITY_VERTEX);
     m_RootSig.Finalize(L"RootSig", D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -200,6 +209,11 @@ void Renderer::Initialize(void)
     m_DefaultPSO.SetVertexShader(g_pDefaultVS, sizeof(g_pDefaultVS));
     m_DefaultPSO.SetPixelShader(g_pDefaultPS, sizeof(g_pDefaultPS));
 
+    //TM2 PSO
+    transfer_matrix.TM2PSO.SetRootSignature(m_RootSig);
+    transfer_matrix.TM2PSO.SetRenderTargetFormats(1, &ColorFormat, DepthFormat);
+
+
     // Skybox PSO
 
     m_SkyboxPSO = m_DefaultPSO;
@@ -219,10 +233,10 @@ void Renderer::Initialize(void)
     Lighting::InitializeResources();
 
     // Allocate a descriptor table for the common textures
-    m_CommonTextures = s_TextureHeap.Alloc(8);
+    m_CommonTextures = s_TextureHeap.Alloc(8 + 2);
 
-    uint32_t DestCount = 8;
-    uint32_t SourceCounts[] = { 1, 1, 1, 1, 1, 1, 1, 1 };
+    uint32_t DestCount = 8 + 2;
+    uint32_t SourceCounts[] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
     D3D12_CPU_DESCRIPTOR_HANDLE SourceTextures[] =
     {
@@ -234,6 +248,8 @@ void Renderer::Initialize(void)
         Lighting::m_LightShadowArray.GetSRV(),
         Lighting::m_LightGrid.GetSRV(),
         Lighting::m_LightGridBitMask.GetSRV(),
+        transfer_matrix.TIR_LUT.GetSRV(),
+        transfer_matrix.FGD_LUT.GetSRV()
     };
 
     g_Device->CopyDescriptors(1, &m_CommonTextures, &DestCount, DestCount, SourceTextures, SourceCounts, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
@@ -314,7 +330,7 @@ uint8_t Renderer::GetPSO(uint16_t psoFlags)
 {
     using namespace PSOFlags;
 
-    GraphicsPSO ColorPSO = m_DefaultPSO;
+    GraphicsPSO ColorPSO = psoFlags & kUseTM2 ? transfer_matrix.TM2PSO : m_DefaultPSO;
 
     uint16_t Requirements = kHasPosition | kHasNormal;
     ASSERT((psoFlags & Requirements) == Requirements);

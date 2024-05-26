@@ -54,5 +54,6 @@ namespace GameCore
 #define CREATE_APPLICATION( app_class ) \
     int WINAPI wWinMain(_In_ HINSTANCE hInstance, _In_opt_ HINSTANCE /*hPrevInstance*/, _In_ LPWSTR /*lpCmdLine*/, _In_ int nCmdShow) \
     { \
-        return GameCore::RunApplication( app_class(), L#app_class, hInstance, nCmdShow ); \
+        auto app = app_class(); \
+        return GameCore::RunApplication( app, L#app_class, hInstance, nCmdShow ); \
     }

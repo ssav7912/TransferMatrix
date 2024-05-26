@@ -316,19 +316,29 @@ void ModelH3D::LoadTextures(const std::wstring& basePath)
 
         // Load diffuse
         std::wstring diffusePath = basePath + RemoveExt(pMaterial.texDiffusePath);
-        MatTextures[0] = LoadDDSFromFile(diffusePath + L".dds", kWhiteOpaque2D, true);
+        auto tex = LoadDDSFromFile(diffusePath + L".dds", kWhiteOpaque2D, true);
+        MatTextures[0] = tex;
 
         // Load specular
         std::wstring specularPath = basePath + RemoveExt(pMaterial.texSpecularPath);
-        MatTextures[1] = LoadDDSFromFile(specularPath + L".dds", kBlackOpaque2D, true);
+        auto tex2 =  LoadDDSFromFile(specularPath + L".dds", kBlackOpaque2D, true);
+        MatTextures[1] = tex2;
         if (!MatTextures[1].IsValid())
-            MatTextures[1] = LoadDDSFromFile(diffusePath + L"_specular.dds", kBlackOpaque2D, true);
+        {
+            auto tex3 = LoadDDSFromFile(diffusePath + L"_specular.dds", kBlackOpaque2D, true);
+            MatTextures[1] = tex3;
+        }
 
         // Load normal
         std::wstring normalPath = basePath + RemoveExt(pMaterial.texNormalPath);
-        MatTextures[2] = LoadDDSFromFile(normalPath + L".dds", kDefaultNormalMap, false);
-        if (!MatTextures[2].IsValid())
-            MatTextures[2] = LoadDDSFromFile(diffusePath + L"_normal.dds", kDefaultNormalMap, false);
+        auto tex4 = LoadDDSFromFile(normalPath + L".dds", kDefaultNormalMap, false);
+        
+        MatTextures[2] = tex4;
+        if (!MatTextures[2].IsValid()) {
+            auto tex5 = LoadDDSFromFile(diffusePath + L"_normal.dds", kDefaultNormalMap, false);
+            MatTextures[2] = tex5;
+        }
+
 
         uint32_t DestCount = 6;
         uint32_t SourceCounts[] = { 1, 1, 1, 1, 1, 1 };

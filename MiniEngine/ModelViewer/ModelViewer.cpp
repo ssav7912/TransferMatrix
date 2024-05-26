@@ -179,7 +179,16 @@ void ModelViewer::Startup( void )
     }
     else
     {
-        m_ModelInst = Renderer::LoadModel(gltfFileName, forceRebuild);
+        auto Model = Renderer::LoadModel(gltfFileName, forceRebuild);
+        uint32_t UseTransferMatrix = 0;
+        
+        if (CommandLineArgs::GetInteger(L"TransferMatrix", UseTransferMatrix) == true)
+        {
+            Mesh& mesh = *(Mesh*)Model->m_MeshData.get(); //wtf
+            mesh.psoFlags |= PSOFlags::kUseTM2;
+        }
+
+        m_ModelInst = Model;
         m_ModelInst.LoopAllAnimations();
         m_ModelInst.Resize(10.0f);
 

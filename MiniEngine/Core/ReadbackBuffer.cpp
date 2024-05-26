@@ -63,11 +63,13 @@ void ReadbackBuffer::Create( const std::wstring& name, uint32_t NumElements, uin
 void* ReadbackBuffer::Map(void)
 {
     void* Memory;
-    m_pResource->Map(0, &CD3DX12_RANGE(0, m_BufferSize), &Memory);
+    auto range = CD3DX12_RANGE(0, m_BufferSize); 
+    m_pResource->Map(0, &range, &Memory);
     return Memory;
 }
 
 void ReadbackBuffer::Unmap(void)
 {
-    m_pResource->Unmap(0, &CD3DX12_RANGE(0, 0));
+    auto range = CD3DX12_RANGE(0, 0); 
+    m_pResource->Unmap(0, &range);
 }

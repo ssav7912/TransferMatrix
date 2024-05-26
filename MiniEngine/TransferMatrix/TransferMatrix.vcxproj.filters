@@ -30,4 +30,18 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\transfer_matrix\MatrixOperators.hlsli" />
+    <None Include="Shaders\transfer_matrix\HenyeyGreenstein.hlsli" />
+    <None Include="Shaders\transfer_matrix\tensor3d.hlsli" />
+    <None Include="Shaders\transfer_matrix\tm2.hlsli" />
+    <None Include="Shaders\Common.hlsli" />
+  </ItemGroup>
+  <ItemGroup>
+    <FxCompile Include="Shaders\transfer_matrix\TM2DielectricPS.hlsl" />
+    <FxCompile Include="Shaders\DefaultVS.hlsl" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="FGD.dds" />
+  </ItemGroup>
 </Project>

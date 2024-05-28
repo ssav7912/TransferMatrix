@@ -97,8 +97,8 @@ Texture3D TM2Resources::LoadTIRLutFromFile(const std::string& TIR_path)
 
 
 	ASSERT(data.size() == Dim * Dim * Dim);
-
-	const size_t RowPitchBytes = Dim * sizeof(float) * LUT_DIM;
+	
+	const size_t RowPitchBytes = Dim * sizeof(float);
 	TIR.Create3D(RowPitchBytes, Dim, Dim, Dim, DXGI_FORMAT_R32G32B32_FLOAT, data.data());
 	return TIR;
 }

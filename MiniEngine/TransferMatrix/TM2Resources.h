@@ -5,6 +5,8 @@
 #include "Texture3D.h"
 #include "../Core/TextureManager.h"
 
+
+
 class TM2Resources
 {
 public:
@@ -18,6 +20,12 @@ public:
 
 	Texture3D TIR_LUT;
 	TextureRef FGD_LUT;
+
+	//const void* TM2_PS = g_pTM2DielectricPS;
+	//const void* TM2_VS = g_pDefaultVS;
+
+	//static constexpr size_t sizeof_TM2PS = sizeof(g_pTM2DielectricPS);
+	//static constexpr size_t sizeof_TM2VS = sizeof(g_pDefaultVS);
 
 private:
 

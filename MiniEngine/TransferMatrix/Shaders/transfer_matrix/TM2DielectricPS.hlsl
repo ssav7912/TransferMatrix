@@ -3,18 +3,28 @@
 #include "MatrixOperators.hlsli"
 #include "../Common.hlsli"
 
+#define PDF_DEBUG float3(1.0f, 0.0f, 0.0f)
+#define EVAL_DEBUG float3(0.0f, 1.0f, 0.0f)
+#define NAN_DEBUG float3(1.0f, 0.0f, 1.0f)
+
+#define NUM_SAMPLES 5
+
 #define LAYERS_MAX 5
 #define NUM_LAYERS 2
 #define NUM_LOBES (NUM_LAYERS + 1)
 
+#define NO_SECOND_UV 1
 
 //Lookup table for Total Internal Reflection
-Texture3D<float3> TIR_LUT : register(t14);
+Texture3D<float3> TIR_LUT : register(t18);
 
 //LUT for Karis Split-sum FGD approximation.
-Texture2D<float2> FGD_LUT : register(t15);
+Texture2D<float2> FGD_LUT : register(t19);
 
-SamplerState TIR_Sampler : register(s0);
+//IBL
+TextureCube<float3> radianceIBLTexutre : register(t10);
+TextureCube<float3> irradianceIBLTexture : register(t10);
+
 
 
 cbuffer GlobalConstants : register(b1)
@@ -51,11 +61,40 @@ float nrand(float2 uv)
     return frac(sin(dot(uv, float2(12.9898, 78.233))) * 43758.5453);
 }
 
+///Hammersley Generator
+///https://www.shadertoy.com/view/4lscWj
+///Tien-Tsin Wong et al. (1997) Sampling with Hammersley and Halton Points
+///Pharr et al. (2021) PBRT.  
+float2 Hammersley(float i, float numSamples)
+{
+    uint b = uint(i);
+    b = (b << 16u) | (b >> 16u);
+    b = ((b & 0x55555555u) << 1u) | ((b & 0xAAAAAAAAu) >> 1u);
+    b = ((b & 0x33333333u) << 2u) | ((b & 0xCCCCCCCCu) >> 2u);
+    b = ((b & 0x0F0F0F0Fu) << 4u) | ((b & 0xF0F0F0F0u) >> 4u);
+    b = ((b & 0x00FF00FFu) << 8u) | ((b & 0xFF00FF00u) >> 8u);
+    
+    float radicalInverse = float(b) * 2.3283064365386963e-10;
+    
+    return float2(i / numSamples, radicalInverse);
+    
+}
+
+
+
+float3 cartesian_to_spherical(float3 cartesian)
+{
+    float3 cartesian2 = cartesian * cartesian;
+    float phi = acos(cartesian.z / (sqrt(cartesian2.x + cartesian2.y + cartesian2.z)));
+    return float3(sqrt(cartesian2.x + cartesian2.y + cartesian2.z), atan(cartesian.y / cartesian.x), phi);
+
+}
+
 
 //TODO: Probably drop TIR for being too expensive.
 float3 TIR_lookup(float3 coords)
 {
-    return TIR_LUT.Sample(TIR_Sampler, coords);
+    return TIR_LUT.Sample(defaultSampler, coords);
 }
 
 //Lagarde 2011. Compute fresnel reflectance at 0 degrees from IOR
@@ -84,7 +123,7 @@ void albedos(float cti, float alpha, float ior_ij, out float3 r_ij, out float3 t
     //https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
     //Ok split sum approx contains FGD_1 & FGD_2 (whatever that means)
     //tristimulus energy output?
-    float2 splitsum = FGD_LUT.Sample(TIR_Sampler, float2(alpha, cti));
+    float2 splitsum = FGD_LUT.Sample(defaultSampler, float2(alpha, cti));
     
     r_ij = splitsum.xxx;
     r_ji = r_ij;
@@ -266,7 +305,7 @@ float3 eval(sample_record rec, int measure, float3 iors[LAYERS_MAX], float alpha
 {
     if (measure != TM2_MEASURE_SOLID_ANGLE || rec.incident.z > 0)
     {
-        return 0.0f.xxx;
+        return EVAL_DEBUG;
     }
     
     bool reflect = rec.incident.z * rec.outgoing.z > 0;
@@ -319,7 +358,7 @@ float3 eval(sample_record rec, int measure, float3 iors[LAYERS_MAX], float alpha
 
 }
 
-float3 sample(inout sample_record rec, float2 samplePos, float3 iors[LAYERS_MAX], float alphas[LAYERS_MAX])
+float3 sample(inout sample_record rec, float2 samplePos, float Hammersley, float3 iors[LAYERS_MAX], float alphas[LAYERS_MAX])
 {
     /* LOBES */
 	
@@ -327,7 +366,10 @@ float3 sample(inout sample_record rec, float2 samplePos, float3 iors[LAYERS_MAX]
     float3 lobes_incoming_direction[LAYERS_MAX];
 	
 	//TODO: Outgoing lobes
-	
+    outgoing_lobes(rec.incident, iors, alphas, lobes, lobes_incoming_direction);
+    
+    /* Random lobe selection */
+    
     float w[LAYERS_MAX];
     float w_sum = 0.0f;
 	
@@ -341,7 +383,7 @@ float3 sample(inout sample_record rec, float2 samplePos, float3 iors[LAYERS_MAX]
     /* LOBE SELECTION */
     
 	//TODO: random sampling?
-    float sel_w = nrand(samplePos)* w_sum - w[0];
+    float sel_w = Hammersley * w_sum - w[0];
     int sel_i = 0;
     for (sel_i = 0; sel_w > 0.f && sel_i < NUM_LOBES; ++sel_i)
     {
@@ -371,7 +413,7 @@ float3 sample(inout sample_record rec, float2 samplePos, float3 iors[LAYERS_MAX]
     
     if (pdf <= 0.0f)
     {
-        return 0.0f.xxx;
+        return PDF_DEBUG;
     }
     
     //sampled direction
@@ -383,14 +425,10 @@ float3 sample(inout sample_record rec, float2 samplePos, float3 iors[LAYERS_MAX]
     rec.ior = float3_average(iors[reflection ? 0 : NUM_LAYERS]);
     rec.is_reflection_sample = reflection ? false : true;
     rec.sample_type = reflection ? TM2_SAMPLE_TYPE_GLOSSY_REFLECTION : TM2_SAMPLE_TYPE_GLOSSY_TRANSMISSION;
-    
-    pdf = 0.0f;
-    if (pdf <= 0.f)
-    {
-        return float3(0.0f, 0.0f, 0.0f);
-    }
+ 
     
     /* PDF */
+    pdf = 0.0f;
     for (int i = 0; i < NUM_LOBES; i++)
     {
         //likely to cause divergence
@@ -431,7 +469,7 @@ float3 sample(inout sample_record rec, float2 samplePos, float3 iors[LAYERS_MAX]
     float3 throughput = eval(rec, TM2_MEASURE_SOLID_ANGLE, iors, alphas);
     
     
-    return pdf > 0.f ? throughput / pdf : float3(0.0f, 0.0f, 0.0f);
+    return pdf > 0.f ? throughput / pdf : PDF_DEBUG;
     
 }
 
@@ -442,40 +480,66 @@ float2 tangent_to_projective(float3 tangent_in)
 
 }
 
-float4 main(VSOutput vsOutput) : SV_TARGET
+[RootSignature(Renderer_RootSig)]
+float4 main(VSOutput vsOutput) : SV_Target0
 {
     //interface between air and arbitrarysurface.
-    float3 iors[LAYERS_MAX] = { float3(1.3, 1.3, 1.3f), float3(1.4f, 1.4, 1.4f), 1.0.xxx, 1.0.xxx, 1.0.xxx };
-    float alphas[LAYERS_MAX] = { 0.0f, 0.8f, 1.0f, 1.0f, 1.0f };
+    float3 iors[LAYERS_MAX] = { float3(1.3f, 0.96521, 0.6177f), float3(1.0f, 1.0f, 1.0f), 1.0f.xxx, 1.0f.xxx, 1.0f.xxx };
+    float alphas[LAYERS_MAX] = { 0.9f, 1.0f, 1.0f, 1.0f, 0.2f };
 	
     
     float3 normal = normalize(vsOutput.normal);
     
     float3 tangent = normalize(vsOutput.tangent.xyz);
     float3 bitangent = normalize(cross(normal, tangent)) * vsOutput.tangent.w;
-    float3x3 tangentFrame = float3x3(tangent, bitangent, normal);
+    float3x3 WorldToTangent = float3x3(tangent, bitangent, normal);
+    float3x3 TangentToWorld = transpose(WorldToTangent);
     
-    float3 SunDirectionTangent = mul(SunDirection, tangentFrame);
+    float3 SunDirectionTangent = mul(WorldToTangent, normalize(float3(1.0f, -0.5f, 0.0f)));
+    float3 SunDirectionReflect = reflect(SunDirectionTangent, float3(0.0f, 1.0f, 0.0f));
+    
+    float3 ViewerRay = normalize(ViewerPos - vsOutput.worldPos);
+    
+    
+    float3 IBLIncidentRay = -ViewerRay;
+    
+    float3 sunPower = float3(1.0f, 0.5f, 0.1f);
+    
+    float3 IBLradiance = radianceIBLTexutre.SampleLevel(cubeMapSampler, reflect(-ViewerRay, normal), 0);
+    
     
     //do 4 samples?
     sample_record rec = 
     {
-        SunDirectionTangent,
-        reflect(SunDirectionTangent, float3(0, 0, 1)),
-        1.0f,
+        float3(0.0f, 0.0f, -1.0f),
+        mul(WorldToTangent, -ViewerRay),
+        1.333f,
         true,
         TM2_SAMPLE_TYPE_GLOSSY_REFLECTION
     };
     
-    float3 accum = sample(rec, float2(nrand(vsOutput.uv0), nrand(vsOutput.uv0)), iors, alphas);
-    rec.sample_type = TM2_SAMPLE_TYPE_GLOSSY_TRANSMISSION;
+    float3 accum = 0.0f.xxx;
     
-    accum += sample(rec, float2(nrand(vsOutput.uv0), nrand(vsOutput.uv0)), iors, alphas);
-    rec.sample_type = TM2_SAMPLE_TYPE_GLOSSY_REFLECTION;
+    for (int i = 0; i < NUM_SAMPLES; i++)
+    {
+        float2 samplePoint = float2(Hammersley(vsOutput.uv0.x, NUM_SAMPLES).x, Hammersley(vsOutput.uv0.y, NUM_SAMPLES).x);
+        float3 sampleEnergy = sample(rec, samplePoint, samplePoint.x, iors, alphas);
+        float3 outgoing_facing = dot(rec.outgoing, mul(WorldToTangent, -ViewerRay));
+        
+        accum += IBLradiance * outgoing_facing * sampleEnergy;
+
+        //accum += IBLradiance * eval(rec, TM2_MEASURE_SOLID_ANGLE, iors, alphas);
+        //rec.is_reflection_sample = i % 2;
+        //rec.sample_type = i % 2;
+        
+        //rec.sample_type = i % 2; //alternate between glossy transmission and reflection
+    }
+    if (isnan(accum.x) || isnan(accum.y) || isnan(accum.z) || isinf(accum.x) || isinf(accum.y) || isinf(accum.z))
+    {
+        accum = NAN_DEBUG;
+    }
     
-    accum += sample(rec, float2(nrand(vsOutput.uv0), nrand(vsOutput.uv0)), iors, alphas);
-    rec.sample_type = TM2_SAMPLE_TYPE_GLOSSY_TRANSMISSION;
     
 	
-	return float4(accum, 1.0f);
+    return float4(accum, 1.0f);
 }

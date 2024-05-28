@@ -17,6 +17,8 @@
 //#undef ENABLE_SKINNING
 #endif
 
+#define NO_SECOND_UV 1
+
 cbuffer MeshConstants : register(b0)
 {
     float4x4 WorldMatrix;   // Object to world

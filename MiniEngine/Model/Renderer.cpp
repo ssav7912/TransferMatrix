@@ -330,7 +330,12 @@ uint8_t Renderer::GetPSO(uint16_t psoFlags)
 {
     using namespace PSOFlags;
 
-    GraphicsPSO ColorPSO = psoFlags & kUseTM2 ? transfer_matrix.TM2PSO : m_DefaultPSO;
+    uint32_t UseTransferMatrix = 0;
+    bool useTM2 = CommandLineArgs::GetInteger(L"TransferMatrix", UseTransferMatrix);
+
+
+
+    GraphicsPSO ColorPSO = useTM2 ? transfer_matrix.TM2PSO : m_DefaultPSO;
 
     uint16_t Requirements = kHasPosition | kHasNormal;
     ASSERT((psoFlags & Requirements) == Requirements);
@@ -356,65 +361,68 @@ uint8_t Renderer::GetPSO(uint16_t psoFlags)
 
     ColorPSO.SetInputLayout((uint32_t)vertexLayout.size(), vertexLayout.data());
 
-    if (psoFlags & kHasSkin)
+    if (!useTM2)
     {
-        if (psoFlags & kHasTangent)
-        {
-            if (psoFlags & kHasUV1)
-            {
-                ColorPSO.SetVertexShader(g_pDefaultSkinVS, sizeof(g_pDefaultSkinVS));
-                ColorPSO.SetPixelShader(g_pDefaultPS, sizeof(g_pDefaultPS));
-            }
-            else
-            {
-                ColorPSO.SetVertexShader(g_pDefaultNoUV1SkinVS, sizeof(g_pDefaultNoUV1SkinVS));
-                ColorPSO.SetPixelShader(g_pDefaultNoUV1PS, sizeof(g_pDefaultNoUV1PS));
-            }
-        }
-        else
-        {
-            if (psoFlags & kHasUV1)
-            {
-                ColorPSO.SetVertexShader(g_pDefaultNoTangentSkinVS, sizeof(g_pDefaultNoTangentSkinVS));
-                ColorPSO.SetPixelShader(g_pDefaultNoTangentPS, sizeof(g_pDefaultNoTangentPS));
-            }
-            else
-            {
-                ColorPSO.SetVertexShader(g_pDefaultNoTangentNoUV1SkinVS, sizeof(g_pDefaultNoTangentNoUV1SkinVS));
-                ColorPSO.SetPixelShader(g_pDefaultNoTangentNoUV1PS, sizeof(g_pDefaultNoTangentNoUV1PS));
-            }
-        }
-    }
-    else
-    {
-        if (psoFlags & kHasTangent)
-        {
-            if (psoFlags & kHasUV1)
-            {
-                ColorPSO.SetVertexShader(g_pDefaultVS, sizeof(g_pDefaultVS));
-                ColorPSO.SetPixelShader(g_pDefaultPS, sizeof(g_pDefaultPS));
-            }
-            else
-            {
-                ColorPSO.SetVertexShader(g_pDefaultNoUV1VS, sizeof(g_pDefaultNoUV1VS));
-                ColorPSO.SetPixelShader(g_pDefaultNoUV1PS, sizeof(g_pDefaultNoUV1PS));
-            }
-        }
-        else
-        {
-            if (psoFlags & kHasUV1)
-            {
-                ColorPSO.SetVertexShader(g_pDefaultNoTangentVS, sizeof(g_pDefaultNoTangentVS));
-                ColorPSO.SetPixelShader(g_pDefaultNoTangentPS, sizeof(g_pDefaultNoTangentPS));
-            }
-            else
-            {
-                ColorPSO.SetVertexShader(g_pDefaultNoTangentNoUV1VS, sizeof(g_pDefaultNoTangentNoUV1VS));
-                ColorPSO.SetPixelShader(g_pDefaultNoTangentNoUV1PS, sizeof(g_pDefaultNoTangentNoUV1PS));
-            }
-        }
-    }
 
+        if (psoFlags & kHasSkin)
+        {
+            if (psoFlags & kHasTangent)
+            {
+                if (psoFlags & kHasUV1)
+                {
+                    ColorPSO.SetVertexShader(g_pDefaultSkinVS, sizeof(g_pDefaultSkinVS));
+                    ColorPSO.SetPixelShader(g_pDefaultPS, sizeof(g_pDefaultPS));
+                }
+                else
+                {
+                    ColorPSO.SetVertexShader(g_pDefaultNoUV1SkinVS, sizeof(g_pDefaultNoUV1SkinVS));
+                    ColorPSO.SetPixelShader(g_pDefaultNoUV1PS, sizeof(g_pDefaultNoUV1PS));
+                }
+            }
+            else
+            {
+                if (psoFlags & kHasUV1)
+                {
+                    ColorPSO.SetVertexShader(g_pDefaultNoTangentSkinVS, sizeof(g_pDefaultNoTangentSkinVS));
+                    ColorPSO.SetPixelShader(g_pDefaultNoTangentPS, sizeof(g_pDefaultNoTangentPS));
+                }
+                else
+                {
+                    ColorPSO.SetVertexShader(g_pDefaultNoTangentNoUV1SkinVS, sizeof(g_pDefaultNoTangentNoUV1SkinVS));
+                    ColorPSO.SetPixelShader(g_pDefaultNoTangentNoUV1PS, sizeof(g_pDefaultNoTangentNoUV1PS));
+                }
+            }
+        }
+        else
+        {
+            if (psoFlags & kHasTangent)
+            {
+                if (psoFlags & kHasUV1)
+                {
+                    ColorPSO.SetVertexShader(g_pDefaultVS, sizeof(g_pDefaultVS));
+                    ColorPSO.SetPixelShader(g_pDefaultPS, sizeof(g_pDefaultPS));
+                }
+                else
+                {
+                    ColorPSO.SetVertexShader(g_pDefaultNoUV1VS, sizeof(g_pDefaultNoUV1VS));
+                    ColorPSO.SetPixelShader(g_pDefaultNoUV1PS, sizeof(g_pDefaultNoUV1PS));
+                }
+            }
+            else
+            {
+                if (psoFlags & kHasUV1)
+                {
+                    ColorPSO.SetVertexShader(g_pDefaultNoTangentVS, sizeof(g_pDefaultNoTangentVS));
+                    ColorPSO.SetPixelShader(g_pDefaultNoTangentPS, sizeof(g_pDefaultNoTangentPS));
+                }
+                else
+                {
+                    ColorPSO.SetVertexShader(g_pDefaultNoTangentNoUV1VS, sizeof(g_pDefaultNoTangentNoUV1VS));
+                    ColorPSO.SetPixelShader(g_pDefaultNoTangentNoUV1PS, sizeof(g_pDefaultNoTangentNoUV1PS));
+                }
+            }
+        }
+    }
     if (psoFlags & kAlphaBlend)
     {
         ColorPSO.SetBlendState(BlendPreMultiplied);

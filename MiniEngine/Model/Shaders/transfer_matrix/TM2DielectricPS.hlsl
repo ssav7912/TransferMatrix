@@ -7,6 +7,7 @@
 #define NUM_LAYERS 2
 #define NUM_LOBES (NUM_LAYERS + 1)
 
+#define NO_SECOND_UV 1
 
 //Lookup table for Total Internal Reflection
 Texture3D<float3> TIR_LUT : register(t14);

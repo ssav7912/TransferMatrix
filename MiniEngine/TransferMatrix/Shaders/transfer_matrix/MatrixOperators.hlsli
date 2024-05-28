@@ -13,6 +13,16 @@ float3 reflection_energy_tm2(tensor3d2x2 m_ij)
     return m_ij._21 / m_ij._11;
 }
 
+float reflection_energy_tm2(float2x2 m_ij, float cond)
+{
+    return (m_ij._21 + m_ij._22 * cond) / (m_ij._11 + m_ij._12 * cond);
+}
+
+float3 reflection_energy_tm2(tensor3d2x2 m, float3 cond)
+{
+    return (m._21 + m._22 * cond) / (m._11 + m._12 * cond);
+}
+
 //computes downward transmission energy for transfer matrix of interface separating 2 media.
 float transmission_energy_tm2(float2x2 m_ij)
 {

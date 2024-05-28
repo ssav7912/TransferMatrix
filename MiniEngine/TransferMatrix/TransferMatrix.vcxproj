@@ -167,7 +167,7 @@
     <None Include="Shaders\transfer_matrix\HenyeyGreenstein.hlsli" />
     <None Include="Shaders\transfer_matrix\MatrixOperators.hlsli" />
     <None Include="Shaders\transfer_matrix\tensor3d.hlsli" />
-    <None Include="Shaders\transfer_matrix\tm2.hlsli" />
+    <None Include="Shaders\transfer_matrix\tm2_common.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\DefaultVS.hlsl">
@@ -191,6 +191,12 @@
       <HeaderFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)..\Build\$(Platform)\$(Configuration)\Output\$(ProjectName)\CompiledShaders\%(Filename).h</HeaderFileOutput>
       <ObjectFileOutput Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
       </ObjectFileOutput>
+    </FxCompile>
+    <FxCompile Include="Shaders\transfer_matrix\TM2OpaquePS.hlsl">
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Pixel</ShaderType>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Pixel</ShaderType>
     </FxCompile>
   </ItemGroup>
   <ItemGroup>

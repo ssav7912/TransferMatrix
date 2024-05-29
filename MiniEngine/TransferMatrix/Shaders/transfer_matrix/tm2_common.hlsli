@@ -13,11 +13,12 @@ static const uint TM2_MEASURE_SOLID_ANGLE = 0;
 
 static const uint TM2_TYPE_NOCOMPONENT = 0;
 static const uint TM2_TYPE_DIELECTRICINTERFACE = 1;
+static const uint TM2_TYPE_CONDUCTORINTERFACE = 2;
 
 
-#define PDF_DEBUG float3(1.0f, 0.0f, 0.0f)
-#define EVAL_DEBUG float3(0.0f, 1.0f, 0.0f)
-#define NAN_DEBUG float3(1.0f, 0.0f, 1.0f)
+#define PDF_DEBUG float3(0.0f, 0.0f, 0.0f)
+#define EVAL_DEBUG float3(0.0f, 0.0f, 0.0f)
+#define NAN_DEBUG float3(0.0f, 0.0f, 0.0f)
 
 #define NUM_SAMPLES 5
 
@@ -26,6 +27,8 @@ static const uint TM2_TYPE_DIELECTRICINTERFACE = 1;
 #define NUM_LOBES (NUM_LAYERS + 1)
 
 #define NO_SECOND_UV 1
+
+#define EPSILON 1e-6f
 
 
 //Lookup table for Total Internal Reflection
@@ -70,6 +73,10 @@ float copy_sign(float x, float s)
 
 }
 
+float3 reflectSpherical(float3 incident, float3 normal)
+{
+    return 2 * dot(incident, normal) * normal - incident;
+}
 
 float3 reflectZ(float3 f)
 {
@@ -92,7 +99,6 @@ float sinTheta(float3 v)
     return max(0, sqrt(1.0f - v.z * v.z));
 }
 
-//TODO: shortcut
 float sinTheta2(float3 v)
 {
     return 1.0f - v.z * v.z;
@@ -101,6 +107,70 @@ float sinTheta2(float3 v)
 float cosTheta2(float3 v)
 {
     return v.z * v.z;
+}
+
+//based off mitsuba 3 implementation
+float fresnelDielectric(float incidentCosTheta, float ior)
+{
+    float transmittedCosTheta;
+    if (ior == 1.0f)
+    {
+        return 0.0f;
+    }
+    
+    float scale = (incidentCosTheta > 0) ? 1.0f / ior : ior;
+    float transmittedcosTheta2 = 1.0f - (1.0f - incidentCosTheta * incidentCosTheta) * (scale * scale);
+    
+    if (transmittedcosTheta2 <= 0.0f)
+    {
+        return 1.0f;
+    }
+    
+    incidentCosTheta = abs(incidentCosTheta);
+    transmittedCosTheta = sqrt(transmittedcosTheta2);
+    
+    float Rs = (incidentCosTheta - ior * transmittedCosTheta) / (incidentCosTheta + ior * transmittedCosTheta);
+    float Rp = (ior * incidentCosTheta - transmittedCosTheta) / (ior * incidentCosTheta + transmittedCosTheta);
+    
+    return 0.5f * (Rs * Rs + Rp * Rp);
+}
+
+float3 fresnelConductorExact(float incidentCosTheta, float3 ior, float3 kappa)
+{
+    float incidentCosTheta2 = incidentCosTheta * incidentCosTheta;
+    float sinTheta2 = 1 - incidentCosTheta2;
+    float sinTheta4 = sinTheta2 * sinTheta2;
+    
+    float3 temp1 = ior * ior - kappa * kappa - sinTheta2.xxx;
+    float3 a2pb2 = sqrt((temp1 * temp1 + kappa * kappa * ior * ior * 4.0f.xxx));
+    float3 a = sqrt(((a2pb2 + temp1) * 0.5f));
+    
+    float3 term1 = a2pb2 + incidentCosTheta2.xxx;
+    float3 term2 = a * (2 * incidentCosTheta);
+    
+    float3 Rs2 = (term1 - term2) / (term1 + term2);
+    
+    float3 term3 = a2pb2 * incidentCosTheta2 + sinTheta4.xxx;
+    float3 term4 = term2 * sinTheta2;
+    
+    float3 Rp2 = Rs2 * (term3 - term4) / (term3 + term4);
+    
+    return 0.5f * (Rp2 + Rs2);
+}
+
+float3 fresnelConductorApprox(float cosThetaI, float3 ior, float3 kappa)
+{
+    float cosThetaI2 = cosThetaI * cosThetaI;
+    
+    float3 temp = (ior * ior + kappa * kappa) * cosThetaI2;
+    
+    float3 Rp2 = (temp - (ior * (2.0f * cosThetaI) + 1.0f.xxx)) / (temp + (ior * (2 * cosThetaI) + 1.0f.xxx));
+    
+    float3 tmpF = ior * ior + kappa * kappa;
+    
+    float3 Rs2 = (tmpF - (ior * (2.0f * cosThetaI) + cosThetaI2.xxx)) / (tmpF + (ior * (2.0f * cosThetaI2) + cosThetaI2.xxx));
+    
+    return 0.5f * (Rp2 + Rs2);
 }
 
 
@@ -137,7 +207,6 @@ float D_GGX(float3 m, float alpha)
     return 1.0f / (PI * alpha * alpha * root * root);
 
 }
-
 //assume isotropic
 float smithG1(float3 v, float3 m, float alpha)
 {
@@ -159,6 +228,14 @@ float smithG1(float3 v, float3 m, float alpha)
     return 2.0f / (1.0f + 1.0f * 1.0f + root * root);
 
 }
+
+
+float smithG(float3 incident, float3 outgoing, float3 m, float rough)
+{
+    return smithG1(incident, m, rough) * smithG1(outgoing, m, rough);
+}
+
+
 //https://ubm-twvideo01.s3.amazonaws.com/o1/vault/gdc2017/Presentations/Hammon_Earl_PBR_Diffuse_Lighting.pdf
 //Earl H. (2017)
 float smithG2(float3 V, float3 N, float3 L, float rough)
@@ -231,9 +308,19 @@ float2 Hammersley(float i, float numSamples)
 float3 cartesian_to_spherical(float3 cartesian)
 {
     float3 cartesian2 = cartesian * cartesian;
-    float phi = acos(cartesian.z / (sqrt(cartesian2.x + cartesian2.y + cartesian2.z)));
-    return float3(sqrt(cartesian2.x + cartesian2.y + cartesian2.z), atan(cartesian.y / cartesian.x), phi);
+    float theta = atan2(cartesian.y, cartesian.x);
+    float phi = atan2(sqrt(cartesian2.x + cartesian2.y + cartesian2.z), cartesian.z);
+    return float3(sqrt(cartesian2.x + cartesian2.y + cartesian2.z), theta, phi);
 
+}
+
+float3 spherical_to_cartesian(float3 spherical)
+{
+    float x = spherical.x * sin(spherical.y) * cos(spherical.z);
+    float y = spherical.x * sin(spherical.y) * sin(spherical.z);
+    float z = spherical.x * cos(spherical.y);
+    
+    return float3(x, y, z);
 }
 
 
@@ -279,6 +366,13 @@ void albedos(float cti, float alpha, float ior_ij, out float3 r_ij, out float3 t
     
 }
 
+void albedo(float cti, float alpha, float3 ior_ij, float3 kappa_ij, out float3 r_ij)
+{
+    //TODO: investigates
+    r_ij = FGD_LUT.Sample(defaultSampler, float2(alpha, cti)).xxx; //Doesn't capture specular..?
+
+}
+
 void dielectric_transfer_factors(float3 incident, float ior, float alpha, out layer_components_tm2 ops)
 {
     float ior_ji = 0.0f;
@@ -314,6 +408,16 @@ void dielectric_transfer_factors(float3 incident, float ior, float alpha, out la
     
     albedos(abs(incident.z), alpha, ior, ops.reflection_down.norm, ops.transmission_down.norm, ops.reflection_up.norm, ops.transmission_up.norm);
 
+}
+
+void conductor_transfer_factors(float3 incident, float3 ior, float3 kappa, float rough, out layer_components_tm2 ops)
+{
+    ops.component_type = TM2_TYPE_CONDUCTORINTERFACE;
+    
+    ops.reflection_down.asymmetry = ggx_to_hg(rough);
+    ops.reflection_down.mean = reflectZ(incident);
+    
+    albedo(abs(incident.z), rough, ior, kappa, ops.reflection_down.norm);
 }
 
 cbuffer GlobalConstants : register(b1)

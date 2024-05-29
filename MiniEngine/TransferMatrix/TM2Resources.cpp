@@ -9,21 +9,14 @@
 //TODO: fix this stupid shit
 #include "../Build/x64/Debug/Output/TransferMatrix/CompiledShaders/DefaultVS.h"
 #include "../Build/x64/Debug/Output/TransferMatrix/CompiledShaders/TM2DielectricPS.h"
+#include "../Build/x64/Debug/Output/TransferMatrix/CompiledShaders/TM2OpaquePS.h"
 
-TM2Resources::TM2Resources(const std::string & FGD_path, const std::string & TIR_path) : FGD_LUT(TextureManager::LoadDDSFromFile(FGD_path))
+
+TM2Resources::TM2Resources(const std::string & FGD_path, const std::string & TIR_path)
 {
 
 	//init PSO
-	TM2PSO.SetRasterizerState(Graphics::RasterizerDefault);
-	TM2PSO.SetBlendState(Graphics::BlendDisable);
-	TM2PSO.SetDepthStencilState(Graphics::DepthStateReadWrite);
-	TM2PSO.SetInputLayout(0, nullptr);
-	TM2PSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
-	TM2PSO.SetVertexShader(g_pDefaultVS, sizeof(g_pDefaultVS));
-	TM2PSO.SetPixelShader(g_pTM2DielectricPS, sizeof(g_pTM2DielectricPS));
-
-	
-	TIR_LUT = LoadTIRLutFromFile(TIR_path);
+	Initialise(FGD_path, TIR_path);
 
 }
 
@@ -40,7 +33,7 @@ void TM2Resources::Initialise(const std::string& FGD_path, const std::string& TI
 	TM2PSO.SetInputLayout(0, nullptr);
 	TM2PSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 	TM2PSO.SetVertexShader(g_pDefaultVS, sizeof(g_pDefaultVS));
-	TM2PSO.SetPixelShader(g_pTM2DielectricPS, sizeof(g_pTM2DielectricPS));
+	TM2PSO.SetPixelShader(g_pTM2OpaquePS, sizeof(g_pTM2OpaquePS));
 
 
 	TIR_LUT = LoadTIRLutFromFile(TIR_path);

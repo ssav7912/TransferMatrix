@@ -20,7 +20,7 @@ static const uint TM2_TYPE_CONDUCTORINTERFACE = 2;
 #define EVAL_DEBUG float3(0.0f, 0.0f, 0.0f)
 #define NAN_DEBUG float3(0.0f, 0.0f, 0.0f)
 
-#define NUM_SAMPLES 5
+#define NUM_SAMPLES 100
 
 #define LAYERS_MAX 5
 #define NUM_LAYERS 2
@@ -59,6 +59,12 @@ struct sample_record
     float ior;
     bool is_reflection_sample;
     bool sample_type;
+};
+
+struct IBLLight
+{
+    float3 radiance;
+    float3 irradiance;
 };
 
 float float3_average(float3 f)
@@ -305,22 +311,63 @@ float2 Hammersley(float i, float numSamples)
 
 
 
+///Translate cartesian to spherical coordinates. Note the cartesian basis is Y-up.
 float3 cartesian_to_spherical(float3 cartesian)
 {
+    float InUp = cartesian.y;
+    float InRight = cartesian.x;
+    float InForward = cartesian.z;
+    
     float3 cartesian2 = cartesian * cartesian;
-    float theta = atan2(cartesian.y, cartesian.x);
-    float phi = atan2(sqrt(cartesian2.x + cartesian2.y + cartesian2.z), cartesian.z);
-    return float3(sqrt(cartesian2.x + cartesian2.y + cartesian2.z), theta, phi);
+    //float theta = atan2(cartesian.y, cartesian.x);
+    //float phi = atan2(sqrt(cartesian2.x + cartesian2.y + cartesian2.z), cartesian.z);
+    float elevation = atan2(InRight, InForward);
+    float azimuth = atan2(sqrt(InForward * InForward + InRight * InRight), InUp);
+    
+    return float3(sqrt(cartesian2.x + cartesian2.y + cartesian2.z), azimuth, elevation);
 
 }
 
+///Takes coordinates of form (radius, Azimuth, Elevation), returns (Right, Up, Forward).
 float3 spherical_to_cartesian(float3 spherical)
 {
-    float x = spherical.x * sin(spherical.y) * cos(spherical.z);
-    float y = spherical.x * sin(spherical.y) * sin(spherical.z);
-    float z = spherical.x * cos(spherical.y);
+    float InRadius = spherical.x;
+    float InElevation = spherical.z;
+    float InAzimuth = spherical.y;
     
-    return float3(x, y, z);
+    float SinAzimuth = sin(InAzimuth);
+    float CosAzimuth = cos(InAzimuth);
+    
+    float CosElevation = cos(InElevation);
+    float SinElevation = sin(InElevation);
+   
+    
+    float Forward = InRadius * CosElevation * SinAzimuth;
+    float Right = InRadius * SinElevation * SinAzimuth;
+    float Up = InRadius * CosAzimuth;
+    
+    return float3(Right, Up, Forward);
+}
+
+
+
+//takes tangent space cartesian coords and transforms it to mitsuba local space (spherical?)
+float3 cartesianTSToMitsubaLS(float3 cartesian)
+{
+    const float3 s = float3(1, 0, 0);
+    const float3 t = float3(0, 0, 1);
+    const float3 n = float3(0, 1, 0);
+    return float3(dot(cartesian, s), dot(cartesian, n), dot(cartesian, t));
+
+}
+
+float3 MitsubaLSToCartesianTS(float3 mitsuba)
+{
+    const float3 s = float3(1, 0, 0);
+    const float3 t = float3(0, 0, 1);
+    const float3 n = float3(0, 1, 0);
+    
+    return s * mitsuba.x + n * mitsuba.y + t * mitsuba.z;
 }
 
 
@@ -330,11 +377,11 @@ float3 TIR_lookup(float3 coords)
     return TIR_LUT.Sample(defaultSampler, coords);
 }
 
+
 //Lagarde 2011. Compute fresnel reflectance at 0 degrees from IOR
-float f0(float ior)
+float3 f0(float3 ior)
 {
     return ((ior - 1) * (ior - 1)) / ((ior + 1) * (ior + 1));
-
 }
 
 void albedos(float cti, float alpha, float ior_ij, out float3 r_ij, out float3 t_ij, out float3 r_ji, out float3 t_ji)
@@ -358,7 +405,8 @@ void albedos(float cti, float alpha, float ior_ij, out float3 r_ij, out float3 t
     //tristimulus energy output?
     float2 splitsum = FGD_LUT.Sample(defaultSampler, float2(alpha, cti));
     
-    r_ij = splitsum.xxx;
+    
+    r_ij = splitsum.xxx + f0(ior_ij.xxx).x * splitsum.y;
     r_ji = r_ij;
     
     t_ij = 1.0f.xxx - r_ij;
@@ -366,12 +414,17 @@ void albedos(float cti, float alpha, float ior_ij, out float3 r_ij, out float3 t
     
 }
 
+
+
 void albedo(float cti, float alpha, float3 ior_ij, float3 kappa_ij, out float3 r_ij)
 {
     //TODO: investigates
-    r_ij = FGD_LUT.Sample(defaultSampler, float2(alpha, cti)).xxx; //Doesn't capture specular..?
+    float2 FGD = FGD_LUT.Sample(defaultSampler, float2(alpha, cti)).x;
+    
+    r_ij = FGD.xxx + f0(ior_ij) * FGD.y;
 
 }
+
 
 void dielectric_transfer_factors(float3 incident, float ior, float alpha, out layer_components_tm2 ops)
 {

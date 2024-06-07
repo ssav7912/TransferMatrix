@@ -20,7 +20,7 @@ static const uint TM2_TYPE_CONDUCTORINTERFACE = 2;
 #define EVAL_DEBUG float3(0.0f, 0.0f, 0.0f)
 #define NAN_DEBUG float3(0.0f, 0.0f, 0.0f)
 
-#define NUM_SAMPLES 100
+#define NUM_SAMPLES 5
 
 #define LAYERS_MAX 5
 #define NUM_LAYERS 2
@@ -40,6 +40,8 @@ Texture2D<float2> FGD_LUT : register(t19);
 //IBL
 TextureCube<float3> radianceIBLTexutre : register(t10);
 TextureCube<float3> irradianceIBLTexture : register(t10);
+
+
 
 
 struct layer_components_tm2
@@ -141,10 +143,28 @@ float fresnelDielectric(float incidentCosTheta, float ior)
     return 0.5f * (Rs * Rs + Rp * Rp);
 }
 
+
+float Pow5(float x)
+{
+    float xSq = x * x;
+    return xSq * xSq * x;
+}
+
+// Shlick's approximation of Fresnel
+float3 Fresnel_Shlick(float3 F0, float3 F90, float cosine)
+{
+    return lerp(F0, F90, Pow5(1.0 - cosine));
+}
+
+float Fresnel_Shlick(float F0, float F90, float cosine)
+{
+    return lerp(F0, F90, Pow5(1.0 - cosine));
+}
+
 float3 fresnelConductorExact(float incidentCosTheta, float3 ior, float3 kappa)
 {
     float incidentCosTheta2 = incidentCosTheta * incidentCosTheta;
-    float sinTheta2 = 1 - incidentCosTheta2;
+    float sinTheta2 = 1.0f - incidentCosTheta2;
     float sinTheta4 = sinTheta2 * sinTheta2;
     
     float3 temp1 = ior * ior - kappa * kappa - sinTheta2.xxx;
@@ -152,7 +172,7 @@ float3 fresnelConductorExact(float incidentCosTheta, float3 ior, float3 kappa)
     float3 a = sqrt(((a2pb2 + temp1) * 0.5f));
     
     float3 term1 = a2pb2 + incidentCosTheta2.xxx;
-    float3 term2 = a * (2 * incidentCosTheta);
+    float3 term2 = a * (2.0f * incidentCosTheta);
     
     float3 Rs2 = (term1 - term2) / (term1 + term2);
     
@@ -202,6 +222,38 @@ float3 sample_GGX(float2 sample, float alpha, out float pdf)
     float sinThetaM = sqrt(max(0.0f, 1 - cosThetaM * cosThetaM));
     
     return float3(sinThetaM * cosPhiM, sinThetaM * sinPhiM, cosThetaM);
+}
+
+float3 sample_GGX_Visible(float3 incident, float2 samplePoint, float rough)
+{
+    float3 incident_weighted = normalize(float3(rough * incident.x, rough * incident.y, incident.z));
+    
+    float theta = 0.0f;
+    float phi = 0.0f;
+    
+    if (incident.z < 0.99999f)
+    {
+        theta = acos(incident_weighted);
+        phi = atan2(incident_weighted.y, incident_weighted.x);
+    }
+    
+    float sinphi;
+    float cosphi;
+    
+    sincos(phi, sinphi, cosphi);
+    
+    float2 slope = 0.0f;
+    //sampleVisible11(theta, sample);
+    
+    slope = float2(cosphi * slope.x - sinphi * slope.y,
+                    sinphi * slope.x + cosphi * slope.y);
+    
+    slope.x *= rough;
+    slope.y *= rough;
+    
+    float norm = 1.0f / sqrt(slope.x * slope.x + slope.y * slope.y + 1.0f);
+
+    return float3(-slope.x * norm, -slope.y * norm, norm);
 }
 
 float D_GGX(float3 m, float alpha)
@@ -349,25 +401,26 @@ float3 spherical_to_cartesian(float3 spherical)
     return float3(Right, Up, Forward);
 }
 
-
+//mitsuba standard basis
+static const float3 S = float3(1, 0, 0);
+static const float3 T = float3(0, 1, 0);
+static const float3 N = float3(0, 0, 1);
 
 //takes tangent space cartesian coords and transforms it to mitsuba local space (spherical?)
 float3 cartesianTSToMitsubaLS(float3 cartesian)
 {
-    const float3 s = float3(1, 0, 0);
-    const float3 t = float3(0, 0, 1);
-    const float3 n = float3(0, 1, 0);
-    return float3(dot(cartesian, s), dot(cartesian, n), dot(cartesian, t));
+    cartesian = cartesian.xzy;
+    
+    
+    return float3(dot(cartesian, S), dot(cartesian, N), dot(cartesian, T));
 
 }
 
 float3 MitsubaLSToCartesianTS(float3 mitsuba)
 {
-    const float3 s = float3(1, 0, 0);
-    const float3 t = float3(0, 0, 1);
-    const float3 n = float3(0, 1, 0);
+
     
-    return s * mitsuba.x + n * mitsuba.y + t * mitsuba.z;
+    return (S * mitsuba.x + N * mitsuba.y + T * mitsuba.z).xzy;
 }
 
 
@@ -403,10 +456,10 @@ void albedos(float cti, float alpha, float ior_ij, out float3 r_ij, out float3 t
     //https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
     //Ok split sum approx contains FGD_1 & FGD_2 (whatever that means)
     //tristimulus energy output?
-    float2 splitsum = FGD_LUT.Sample(defaultSampler, float2(alpha, cti));
+    float2 splitsum = FGD_LUT.Sample(defaultSampler, float2(cti, alpha));
     
     
-    r_ij = splitsum.xxx + f0(ior_ij.xxx).x * splitsum.y;
+    r_ij = splitsum.x + f0(ior_ij.xxx).x * splitsum.y;
     r_ji = r_ij;
     
     t_ij = 1.0f.xxx - r_ij;
@@ -419,9 +472,9 @@ void albedos(float cti, float alpha, float ior_ij, out float3 r_ij, out float3 t
 void albedo(float cti, float alpha, float3 ior_ij, float3 kappa_ij, out float3 r_ij)
 {
     //TODO: investigates
-    float2 FGD = FGD_LUT.Sample(defaultSampler, float2(alpha, cti)).x;
+    float2 FGD = FGD_LUT.Sample(defaultSampler, float2(cti, alpha));
     
-    r_ij = FGD.xxx + f0(ior_ij) * FGD.y;
+    r_ij = FGD.x + f0(ior_ij) * FGD.y;
 
 }
 
@@ -471,6 +524,16 @@ void conductor_transfer_factors(float3 incident, float3 ior, float3 kappa, float
     ops.reflection_down.mean = reflectZ(incident);
     
     albedo(abs(incident.z), rough, ior, kappa, ops.reflection_down.norm);
+}
+
+
+//Layer Parameters
+cbuffer LayerParameters : register(b2)
+{
+    float3 IORs[LAYERS_MAX];
+    float3 Kappas[LAYERS_MAX];
+    float Roughs[LAYERS_MAX];
+    int NumLayers;
 }
 
 cbuffer GlobalConstants : register(b1)

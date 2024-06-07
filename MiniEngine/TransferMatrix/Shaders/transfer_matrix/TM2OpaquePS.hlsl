@@ -135,7 +135,7 @@ float3 eval(sample_record rec, int measure, float3 iors[LAYERS_MAX], float3 kapp
     
     
     const float3 H = normalize(rec.incident + rec.outgoing);
-    
+       
     henyey_greenstein lobes[LAYERS_MAX];
     
     outgoing_lobes(rec.incident, iors, kappas, roughnesses, lobes);
@@ -153,6 +153,7 @@ float3 eval(sample_record rec, int measure, float3 iors[LAYERS_MAX], float3 kapp
     }
     else
     {
+        //F0 = Fresnel_Shlick(f0(ior_01), 1.0f.xxx, dot(rec.incident, H));
         F0 = fresnelConductorExact(dot(rec.incident, H), ior_01, kappas[1] / iors[0]);
     }
     
@@ -182,6 +183,11 @@ float3 eval(sample_record rec, int measure, float3 iors[LAYERS_MAX], float3 kapp
 
 float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, float2 samplePoint, float Hammersley, float3 iors[LAYERS_MAX], float3 kappas[LAYERS_MAX], float roughness[LAYERS_MAX])
 {
+    if (rec.incident.z < 0)
+    {
+        return PDF_DEBUG;
+    }
+    
     henyey_greenstein lobes[LAYERS_MAX];
     
     //TODO outgoing lobes
@@ -204,6 +210,7 @@ float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, floa
         sel_w -= w[sel_i + 1];
     }
     
+    
     //sampling
     
     lobe_rough = hg_to_ggx(lobes[sel_i].asymmetry);
@@ -212,7 +219,7 @@ float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, floa
 
     rec.outgoing = reflectSpherical(rec.incident, H);
     rec.ior = 1.f;
-    rec.is_reflection_sample = 0;
+    rec.is_reflection_sample = false;
     rec.sample_type = TM2_SAMPLE_TYPE_GLOSSY_REFLECTION;
     
     if (rec.outgoing.z <= 0.f || pdf <= 0.0f)
@@ -298,10 +305,10 @@ float compute_pdf(sample_record rec, int measure, float3 iors[LAYERS_MAX], float
 
 float4 main(VSOutput vsOutput) : SV_Target0
 {
-	    //interface between air and arbitrarysurface.
-    float3 iors[LAYERS_MAX] = { float3(1.5f, 1.5f, 1.5f), float3(1.0f, 1.0f, 1.0f), 1.0f.xxx, 1.0f.xxx, 1.0f.xxx };
-    float3 kappas[LAYERS_MAX] = { float3(0.0f, 0.0f, 0.0f), float3(1.0f, 0.1f, 0.1f), 1.0f.xxx, 1.0f.xxx, 1.0f.xxx };
-    float alphas[LAYERS_MAX] = { 0.1f, 0.01f, 1.0f, 1.0f, 0.2f };
+	//iors[0] determines the external media. Layers start from index 1?
+    //float3 iors[LAYERS_MAX] = { 1.003f.xxx, float3(1.0f, 1.0f, 1.0f), float3(1.5f, 1.5f, 1.5f), 1.0f.xxx, 1.0f.xxx};
+    //float3 kappas[LAYERS_MAX] = { 0.0f.xxx, float3(1.0f, 0.1f, 0.1f), float3(0.0f, 0.0f, 0.0f) , 0.0f.xxx, 0.0f.xxx};
+    //float alphas[LAYERS_MAX] = { 0.0f, 0.01f, 0.1f, 1.0f, 1.0f};
 
     
     float3 normal = normalize(vsOutput.normal);
@@ -330,9 +337,10 @@ float4 main(VSOutput vsOutput) : SV_Target0
     
     sample_record rec =
     {
-        //is implementation (radius, azimuth, elevation) or (radius, elevation, azimuth)?
+        //feel like there's something wrong with the CRS i'm providing,
+        //but I don't know what.
         cartesianTSToMitsubaLS(mul(WorldToTangent, ViewerRay)),
-        cartesianTSToMitsubaLS(mul(WorldToTangent, reflect(-ViewerRay, normal))),
+        normalize(cartesianTSToMitsubaLS(mul(WorldToTangent, reflect(-ViewerRay, normal)))),
 
         1.0f,
         true,
@@ -346,7 +354,7 @@ float4 main(VSOutput vsOutput) : SV_Target0
         float2 samplePoint = Hammersley(i, NUM_SAMPLES);
         float pdf;
         float rough;
-        float3 sampleEnergy = sample(rec, pdf, rough, samplePoint, nrand(samplePoint), iors, kappas, alphas);
+        float3 sampleEnergy = sample(rec, pdf, rough, samplePoint, nrand(samplePoint), IORs, Kappas, Roughs);
       
         float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(rec.outgoing));
         
@@ -354,20 +362,8 @@ float4 main(VSOutput vsOutput) : SV_Target0
         float lod = rough * IBLRange + IBLBias;
         float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, outgoingWS, lod);
         
-        accum += sampleEnergy * IBLSample;
-
-        
-        //float pdf = compute_pdf(rec, TM2_MEASURE_SOLID_ANGLE, iors, kappas, alphas);
-        //float3 ThroughputRatio = eval(rec, TM2_MEASURE_SOLID_ANGLE, iors, kappas, alphas);
-        //rec.incident = normalize(reflect(-ViewerRay, normal) + float3(samplePoint.xy, 0.0f));
-        //rec.is_reflection_sample = i % 2;
-        //rec.sample_type = i % 2;
-        
-        //float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, rec.incident, 0);
-
-        
-        //accum += IBLSample * (pdf > 0.0f ? (ThroughputRatio / pdf) : 0.0f.xxx);
-        
+        accum += IBLSample * sampleEnergy;
+       
     }
     if (isnan(accum.x) || isnan(accum.y) || isnan(accum.z) || isinf(accum.x) || isinf(accum.y) || isinf(accum.z))
     {

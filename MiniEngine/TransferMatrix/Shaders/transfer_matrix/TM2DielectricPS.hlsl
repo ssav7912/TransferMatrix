@@ -243,7 +243,6 @@ float3 sample(inout sample_record rec, float2 samplePos, float Hammersley, float
    
    
     //normal sampling
-    //TODO: microfacet NDF
     //TODO: use a sampleVisible rather than SampleAll distribution?
     float pdf;
     float3 H = sample_GGX(samplePos, sel_rough, pdf);

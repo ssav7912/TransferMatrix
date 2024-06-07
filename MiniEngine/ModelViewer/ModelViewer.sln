@@ -4,6 +4,9 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 VisualStudioVersion = 17.7.34031.279
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ModelViewer", "ModelViewer.vcxproj", "{1813BD6E-E2AF-4A3C-8C54-4E72119DA993}"
+	ProjectSection(ProjectDependencies) = postProject
+		{6F33E156-E2A8-4E65-A61B-54F6CE515BFB} = {6F33E156-E2A8-4E65-A61B-54F6CE515BFB}
+	EndProjectSection
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Core", "..\Core\Core.vcxproj", "{86A58508-0D6A-4786-A32F-01A301FDC6F3}"
 EndProject

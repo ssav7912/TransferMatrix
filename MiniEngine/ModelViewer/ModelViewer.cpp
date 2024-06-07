@@ -33,6 +33,12 @@
 #include "ModelLoader.h"
 #include "ShadowCamera.h"
 #include "Display.h"
+#include "../ImGUI/backends/imgui_impl_dx12.h"
+#include "../ImGUI/backends/imgui_impl_win32.h"
+#include "../ImGUI/imgui.h"
+#include "GUI.h"
+#include "../TransferMatrix/TM2Resources.h"
+
 
 #define LEGACY_RENDERER
 
@@ -65,6 +71,9 @@ private:
 
     ModelInstance m_ModelInst;
     ShadowCamera m_SunShadowCamera;
+
+    GUI gui = {};
+    bool CursorVisible = false; 
 };
 
 CREATE_APPLICATION( ModelViewer )
@@ -200,6 +209,12 @@ void ModelViewer::Startup( void )
         m_CameraController.reset(new FlyingFPSCamera(m_Camera, Vector3(kYUnitVector)));
     else
         m_CameraController.reset(new OrbitCamera(m_Camera, m_ModelInst.GetBoundingSphere(), Vector3(kYUnitVector)));
+
+    //IMGUI setup
+    DescriptorHeap FontHeap {};
+    FontHeap.Create(L"Font Descriptor Heap", D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 16);
+    gui.Initialise(g_Device, FontHeap);
+
 }
 
 void ModelViewer::Cleanup( void )
@@ -213,6 +228,8 @@ void ModelViewer::Cleanup( void )
 #endif
 
     Renderer::Shutdown();
+
+    gui.Teardown();
 }
 
 namespace Graphics
@@ -229,7 +246,17 @@ void ModelViewer::Update( float deltaT )
     else if (GameInput::IsFirstPressed(GameInput::kRShoulder))
         DebugZoom.Increment();
 
-    m_CameraController->Update(deltaT);
+    bool Lalt = GameInput::IsFirstPressed(GameInput::kKey_lalt);
+
+    if (Lalt)
+    {
+        CursorVisible = !CursorVisible;
+        ShowCursor(CursorVisible);
+    }
+    else {
+        m_CameraController->Update(deltaT);
+    }
+    
 
     GraphicsContext& gfxContext = GraphicsContext::Begin(L"Scene Update");
 
@@ -295,6 +322,26 @@ void ModelViewer::RenderScene( void )
         globals.SunDirection = SunDirection;
         globals.SunIntensity = Vector3(Scalar(g_SunLightIntensity));
 
+
+        LayerConstants layers;
+        //init external media layer params.
+        layers.IORs[0] = Vector3(1.003f);
+
+        layers.Kappas[0] = Vector3(0.0f);
+
+        layers.Roughs[0] = 1.0f;
+        layers.layers = TM2Resources::NUM_LAYERS;
+        
+        for (size_t i = 0; i < gui.IORs.size(); i++)
+        {
+            layers.IORs[i + 1] = gui.IORs[i];
+
+            layers.Kappas[i + 1] = gui.Kappas[i];
+            layers.Roughs[i + 1] = gui.Roughs[i];
+        }
+
+
+
         // Begin rendering depth
         gfxContext.TransitionResource(g_SceneDepthBuffer, D3D12_RESOURCE_STATE_DEPTH_WRITE, true);
         gfxContext.ClearDepth(g_SceneDepthBuffer);
@@ -345,6 +392,8 @@ void ModelViewer::RenderScene( void )
                 gfxContext.SetRenderTarget(g_SceneColorBuffer.GetRTV(), g_SceneDepthBuffer.GetDSV_DepthReadOnly());
                 gfxContext.SetViewportAndScissor(viewport, scissor);
 
+                gfxContext.SetRootSignature(Renderer::m_RootSig);
+                gfxContext.SetDynamicConstantBufferView(Renderer::RootBindings::kLayerCBV, sizeof(layers), &layers);
                 sorter.RenderMeshes(MeshSorter::kOpaque, gfxContext, globals);
             }
 
@@ -368,6 +417,24 @@ void ModelViewer::RenderScene( void )
         DepthOfField::Render(gfxContext, m_Camera.GetNearClip(), m_Camera.GetFarClip());
     else
         MotionBlur::RenderObjectBlur(gfxContext, g_VelocityBuffer);
+
+    ImGui_ImplWin32_NewFrame();
+    ImGui_ImplDX12_NewFrame();
+    ImGui::NewFrame();
+
+    gui.LayerUI(TM2Resources::NUM_LAYERS, TM2Resources::MAX_LAYERS - 1); //-1 to account for the external media.
+
+
+    ImGui::Render();
+    auto cmdlist = gfxContext.GetCommandList();
+   
+
+
+    gfxContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+    gfxContext.SetRenderTarget(Graphics::g_SceneColorBuffer.GetRTV());
+    gfxContext.SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, gui.FontHeap.GetHeapPointer());
+    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cmdlist);
+    ImGui::EndFrame();
 
     gfxContext.Finish();
 }

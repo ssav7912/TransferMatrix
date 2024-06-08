@@ -18,7 +18,7 @@ static const uint TM2_TYPE_CONDUCTORINTERFACE = 2;
 
 #define PDF_DEBUG float3(0.0f, 0.0f, 0.0f)
 #define EVAL_DEBUG float3(0.0f, 0.0f, 0.0f)
-#define NAN_DEBUG float3(0.0f, 0.0f, 0.0f)
+#define NAN_DEBUG float3(1.0f, 0.0f, 1.0f)
 
 #define NUM_SAMPLES 5
 
@@ -41,6 +41,7 @@ Texture2D<float2> FGD_LUT : register(t19);
 TextureCube<float3> radianceIBLTexutre : register(t10);
 TextureCube<float3> irradianceIBLTexture : register(t10);
 
+sampler LUTSampler : register(s13);
 
 
 
@@ -258,13 +259,24 @@ float3 sample_GGX_Visible(float3 incident, float2 samplePoint, float rough)
 
 float D_GGX(float3 m, float alpha)
 {
+   
+    
     float costheta2 = cosTheta2(m);
-    float beckmann = ((m.x * m.x) / (alpha * alpha) + (m.y * m.y) / (alpha * alpha)) / costheta2;
+    float beckmann = saturate(((m.x * m.x) / (alpha * alpha) + (m.y * m.y) / (alpha * alpha)) / costheta2);
     
     float root = (1.0f + beckmann) * costheta2;
-    return 1.0f / (PI * alpha * alpha * root * root);
+    return saturate(1.0f / (PI * alpha * alpha * root * root));
 
 }
+
+//Karis 2013 distribution.
+float D_GGX_Karis(float NdotH, float rough)
+{
+    float rough_square = rough * rough;
+    float f = (NdotH * NdotH) * (rough_square - 1.0) + 1.0;
+    return rough_square / (PI * f * f);
+}
+
 //assume isotropic
 float smithG1(float3 v, float3 m, float alpha)
 {
@@ -283,7 +295,7 @@ float smithG1(float3 v, float3 m, float alpha)
     
     float root = alpha * tantheta;
                     //hypot2
-    return 2.0f / (1.0f + 1.0f * 1.0f + root * root);
+    return saturate(2.0f / (1.0f + 1.0f * 1.0f + root * root));
 
 }
 
@@ -427,14 +439,14 @@ float3 MitsubaLSToCartesianTS(float3 mitsuba)
 //TODO: Probably drop TIR for being too expensive.
 float3 TIR_lookup(float3 coords)
 {
-    return TIR_LUT.Sample(defaultSampler, coords);
+    return TIR_LUT.Sample(LUTSampler, coords);
 }
 
 
 //Lagarde 2011. Compute fresnel reflectance at 0 degrees from IOR
 float3 f0(float3 ior)
 {
-    return ((ior - 1) * (ior - 1)) / ((ior + 1) * (ior + 1));
+    return ((ior - 1.0f) * (ior - 1.0f)) / ((ior + 1.0f) * (ior + 1.0f));
 }
 
 void albedos(float cti, float alpha, float ior_ij, out float3 r_ij, out float3 t_ij, out float3 r_ji, out float3 t_ji)
@@ -456,13 +468,14 @@ void albedos(float cti, float alpha, float ior_ij, out float3 r_ij, out float3 t
     //https://cdn2.unrealengine.com/Resources/files/2013SiggraphPresentationsNotes-26915738.pdf
     //Ok split sum approx contains FGD_1 & FGD_2 (whatever that means)
     //tristimulus energy output?
-    float2 splitsum = FGD_LUT.Sample(defaultSampler, float2(cti, alpha));
+    float2 splitsum = FGD_LUT.Sample(LUTSampler, float2(cti, alpha));
     
-    
-    r_ij = splitsum.x + f0(ior_ij.xxx).x * splitsum.y;
+    //this crushes up the energy for dielectrics...
+    //why doesn't this warn?
+    r_ij = (splitsum.x + f0(ior_ij.xxx).x * splitsum.y).xxx;
     r_ji = r_ij;
     
-    t_ij = 1.0f.xxx - r_ij;
+    t_ij = 1.0f.xxx - r_ij; //can't be negative
     t_ji = t_ij;
     
 }
@@ -471,8 +484,8 @@ void albedos(float cti, float alpha, float ior_ij, out float3 r_ij, out float3 t
 
 void albedo(float cti, float alpha, float3 ior_ij, float3 kappa_ij, out float3 r_ij)
 {
-    //TODO: investigates
-    float2 FGD = FGD_LUT.Sample(defaultSampler, float2(cti, alpha));
+    //can't be negative! 
+    float2 FGD = FGD_LUT.Sample(LUTSampler, float2(cti, alpha));
     
     r_ij = FGD.x + f0(ior_ij) * FGD.y;
 
@@ -533,7 +546,9 @@ cbuffer LayerParameters : register(b2)
     float3 IORs[LAYERS_MAX];
     float3 Kappas[LAYERS_MAX];
     float Roughs[LAYERS_MAX];
+    double PADDING;
     int NumLayers;
+    int NumSamples;
 }
 
 cbuffer GlobalConstants : register(b1)

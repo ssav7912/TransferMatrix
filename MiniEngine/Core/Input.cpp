@@ -430,6 +430,7 @@ bool GameInput::IsFirstReleased( DigitalInput di )
     return !s_Buttons[0][di] && s_Buttons[1][di];
 }
 
+
 float GameInput::GetDurationPressed( DigitalInput di )
 {
     return s_HoldDuration[di];

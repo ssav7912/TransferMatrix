@@ -6,7 +6,7 @@ void components_transfer_factors(float3 incident, float3 iors[LAYERS_MAX], float
 {
     float3 ior_ij = 0.0f;
     
-    for (int i = 0; i < NUM_LAYERS; i++)
+    for (int i = 0; i < NumLayers; i++)
     {
         ior_ij = iors[i + 1] / iors[i];
         if (kappas[i+1].x + kappas[i+1].y + kappas[i+1].z == 0.0f)
@@ -44,7 +44,7 @@ void outgoing_lobes(float3 incident, float3 ior[LAYERS_MAX], float3 kappas[LAYER
     float asymmetry_T_0j_R = 1.0f;
     float asymmetry_T_0j_RT = 1.0f;
     
-    float3 tir_norm;
+    float3 tir_norm = 0.0f.xxx;
     
     tensor3d2x2 energy_0i =
     {
@@ -59,7 +59,7 @@ void outgoing_lobes(float3 incident, float3 ior[LAYERS_MAX], float3 kappas[LAYER
     
     components_transfer_factors(incident, ior, kappas, roughness, ops);
     
-    for (int i = 0; i < NUM_LAYERS; i++)
+    for (int i = 0; i < NumLayers; i++)
     {
         if (ops[i].component_type == TM2_TYPE_DIELECTRICINTERFACE)
         {
@@ -86,7 +86,7 @@ void outgoing_lobes(float3 incident, float3 ior[LAYERS_MAX], float3 kappas[LAYER
                 tir_norm = TIR_lookup(float3(abs(ops[i].transmission_down.mean.z), hg_to_ggx(asymmetry_T_0j_R), ior_ji)) * ops[i].transmission_up.norm;
                 
                 ops[i].reflection_up.norm += tir_norm;
-                ops[i].transmission_up.norm -= tir_norm;
+                ops[i].transmission_up.norm -= tir_norm; //could go negative if transfer_factors produces negative norm?
 
             }
             
@@ -159,7 +159,7 @@ float3 eval(sample_record rec, int measure, float3 iors[LAYERS_MAX], float3 kapp
     
     float3 throughput = F0 * G2_0 * D0_0 / (4.0f * rec.incident.z);
     
-    for (int i = 1; i < NUM_LAYERS; i++)
+    for (int i = 1; i < NumLayers; i++)
     {
         if (lobes[i].norm.x + lobes[i].norm.y + lobes[i].norm.z == 0.0f)
         {
@@ -195,25 +195,25 @@ float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, floa
     
     //Lobe selection
     
-    float w[LAYERS_MAX];
-    float w_sum = 0.f;
-    for (int i = 0; i < NUM_LAYERS; i++)
+    float weights[LAYERS_MAX];
+    float weight_sum = 0.f;
+    for (int i = 0; i < NumLayers; i++)
     {
-        w[i] = float3_average(lobes[i].norm);
-        w_sum += w[i];
+        weights[i] = float3_average(lobes[i].norm);
+        weight_sum += weights[i];
     }
     
-    float sel_w = Hammersley * w_sum - w[0];
-    int sel_i = 0;
-    for (sel_i = 0; sel_w > 0.f && sel_i < NUM_LAYERS; sel_i++)
+    float selected_weight = Hammersley * weight_sum - weights[0];
+    int selection_index = 0;
+    for (selection_index = 0; selected_weight > 0.f && selection_index < NumLayers; selection_index++)
     {
-        sel_w -= w[sel_i + 1];
+        selected_weight -= weights[selection_index + 1];
     }
     
     
     //sampling
     
-    lobe_rough = hg_to_ggx(lobes[sel_i].asymmetry);
+    lobe_rough = hg_to_ggx(lobes[selection_index].asymmetry);
     
     const float3 H = sample_GGX(samplePoint, lobe_rough, pdf);
 
@@ -230,9 +230,9 @@ float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, floa
     //PDF
     
     pdf = 0.0f;
-    for (int i = 0; i < NUM_LAYERS; i++)
+    for (int i = 0; i < NumLayers; i++)
     {
-        if (w[i] > 0.0f)
+        if (weights[i] > 0.0f)
         {
             const float rough = hg_to_ggx(lobes[i].asymmetry);
             
@@ -249,12 +249,12 @@ float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, floa
         
             const float D = D_GGX(H, rough);
         
-            pdf += w[i] * G1 * D / (4.0f * incoming.z);
+            pdf += weights[i] * G1 * D / (4.0f * incoming.z);
         
 
         }
     }
-    pdf /= w_sum;
+    pdf /= weight_sum;
     
     //Throughput
     
@@ -279,7 +279,7 @@ float compute_pdf(sample_record rec, int measure, float3 iors[LAYERS_MAX], float
     float w_sum = 0.0f;
     float wpdf_sum = 0.0f;
     
-    for (int i = 0; i < NUM_LAYERS; i++)
+    for (int i = 0; i < NumLayers; i++)
     {
         if (lobes[i].norm.x + lobes[i].norm.y + lobes[i].norm.z == 0)
         {
@@ -305,12 +305,6 @@ float compute_pdf(sample_record rec, int measure, float3 iors[LAYERS_MAX], float
 
 float4 main(VSOutput vsOutput) : SV_Target0
 {
-	//iors[0] determines the external media. Layers start from index 1?
-    //float3 iors[LAYERS_MAX] = { 1.003f.xxx, float3(1.0f, 1.0f, 1.0f), float3(1.5f, 1.5f, 1.5f), 1.0f.xxx, 1.0f.xxx};
-    //float3 kappas[LAYERS_MAX] = { 0.0f.xxx, float3(1.0f, 0.1f, 0.1f), float3(0.0f, 0.0f, 0.0f) , 0.0f.xxx, 0.0f.xxx};
-    //float alphas[LAYERS_MAX] = { 0.0f, 0.01f, 0.1f, 1.0f, 1.0f};
-
-    
     float3 normal = normalize(vsOutput.normal);
     
     float3 tangent = normalize(vsOutput.tangent.xyz);
@@ -318,22 +312,7 @@ float4 main(VSOutput vsOutput) : SV_Target0
     float3x3 WorldToTangent = float3x3(tangent, bitangent, normal);
     float3x3 TangentToWorld = transpose(WorldToTangent);
     
-    float3 SunDirectionTangent = mul(WorldToTangent, normalize(float3(1.0f, -0.5f, 0.0f)));
-    float3 SunDirectionReflect = reflect(SunDirectionTangent, float3(0.0f, 1.0f, 0.0f));
-    
     float3 ViewerRay = normalize(ViewerPos - vsOutput.worldPos);
-    float3 PixelToViewerSpherical = cartesian_to_spherical(mul(WorldToTangent, normalize(vsOutput.worldPos - ViewerPos)));
-    
-    float3 ViewerToPixelSpherical = cartesian_to_spherical(mul(WorldToTangent, ViewerRay));
-    
-    float3 IBLIncidentRay = mul(WorldToTangent, -reflect(ViewerRay, normal));
-       
-    float3 IBLradiance = radianceIBLTexutre.SampleLevel(cubeMapSampler, reflect(-ViewerRay, normal), 0);
-        
-    float3 InverseViewerToPixelSpherical = mul(TangentToWorld, spherical_to_cartesian(ViewerToPixelSpherical));
-    
-    
-    
     
     sample_record rec =
     {
@@ -347,30 +326,40 @@ float4 main(VSOutput vsOutput) : SV_Target0
         TM2_SAMPLE_TYPE_GLOSSY_REFLECTION
     };
     
-    float3 accum = 0.0f.xxx;
-
-    for (int i = 0; i < NUM_SAMPLES; i++)
+    float3 accumulated_energy = 0.0f.xxx;
+    float accumulated_rough = 0.0f;
+    float3 accumulated_sample_direction = 0.0f.xxx;
+    
+    for (int i = 0; i < NumSamples; i++)
     {
-        float2 samplePoint = Hammersley(i, NUM_SAMPLES);
+        float2 samplePoint = Hammersley(i, NumSamples);
         float pdf;
         float rough;
         float3 sampleEnergy = sample(rec, pdf, rough, samplePoint, nrand(samplePoint), IORs, Kappas, Roughs);
       
         float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(rec.outgoing));
         
+        accumulated_energy += sampleEnergy;
+        accumulated_rough += rough;
+        accumulated_sample_direction += outgoingWS;
         
-        float lod = rough * IBLRange + IBLBias;
-        float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, outgoingWS, lod);
-        
-        accum += IBLSample * sampleEnergy;
        
     }
-    if (isnan(accum.x) || isnan(accum.y) || isnan(accum.z) || isinf(accum.x) || isinf(accum.y) || isinf(accum.z))
+    if (isnan(accumulated_energy.x) || isnan(accumulated_energy.y) || isnan(accumulated_energy.z) || isinf(accumulated_energy.x) || isinf(accumulated_energy.y) || isinf(accumulated_energy.z))
     {
-        accum = NAN_DEBUG;
+        return float4(NAN_DEBUG, 1.0f);
     }
     
+    float rough = accumulated_rough / NumSamples;
+    float3 energy = accumulated_energy / NumSamples;
+    float3 direction = accumulated_sample_direction / NumSamples;
+    
+    float lod = rough * IBLRange + IBLBias;
+    float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, direction, lod);
+    
+    
+    float3 output = accumulated_energy * IBLSample;
     
 	
-    return float4(accum/NUM_SAMPLES, 1.0f);
+    return float4(output, 1.0f);
 }

@@ -35,12 +35,29 @@ private:
 
 };
 
+struct float3_debug
+{
+	float xyz[3];
+	float pad;
+};
+
+
+__declspec(align(16)) struct float_with_pad
+{
+	float x;
+};
+
 //Constant buffer for layer parameters
 struct LayerConstants
 {
-	Math::Vector3 IORs[TM2Resources::MAX_LAYERS];
-	Math::Vector3 Kappas[TM2Resources::MAX_LAYERS];
-	float Roughs[TM2Resources::MAX_LAYERS];
+	__declspec(align(16)) float3_debug IORs[TM2Resources::MAX_LAYERS];
+	//uint8_t _pad[16];
+	__declspec(align(16)) float3_debug Kappas[TM2Resources::MAX_LAYERS];
+
+	//uint8_t _pad2[16];
+	__declspec(align(16)) float_with_pad Roughs[TM2Resources::MAX_LAYERS];
+	//uint8_t _pad3[16 * 3];
 	int32_t layers;
+	int32_t num_samples;
 };
 

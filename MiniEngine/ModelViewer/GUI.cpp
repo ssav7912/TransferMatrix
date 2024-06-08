@@ -15,11 +15,14 @@ void GUI::Initialise(ID3D12Device* device, DescriptorHeap SRVDescriptorHeap)
 	ImGui::CreateContext();
 	ImGuiIO& io = ImGui::GetIO();
 	
-
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+	io.MouseDrawCursor = true;
 
 	ImGui_ImplWin32_Init(GameCore::g_hWnd);
 	ImGui_ImplDX12_Init(device, 1, DXGI_FORMAT_R11G11B10_FLOAT, FontHeap.GetHeapPointer(),
 		FontHeap.GetHeapPointer()->GetCPUDescriptorHandleForHeapStart(), FontHeap.GetHeapPointer()->GetGPUDescriptorHandleForHeapStart());
+
+
 
 }
 
@@ -31,11 +34,9 @@ void GUI::Teardown()
 
 }
 
-void GUI::LayerUI(uint32_t num_layers, uint32_t max_layers)
+void GUI::LayerUI(int32_t num_layers, int32_t max_layers)
 {
-	IORs.assign(max_layers, { 1.0f, 1.0f, 1.0f });
-	Kappas.assign(max_layers, { 0.0f, 0.0f, 0.0f });
-	Roughs.assign(max_layers, 1.0f);
+	num_layers = std::max(0,std::min(num_layers, max_layers));
 
 	ImGui::SetNextWindowSize({ 600, 768 });
 	ImGui::Begin("Layers");
@@ -43,20 +44,20 @@ void GUI::LayerUI(uint32_t num_layers, uint32_t max_layers)
 	{
 		ImGui::Text(std::format("Layer {0} Params", i).c_str());
 
-		constexpr size_t VECTOR_DIM = 3;
-		float IOR[VECTOR_DIM] = { IOR_DEFAULT[i][0], IOR_DEFAULT[i][1], IOR_DEFAULT[i][2] };
-		float Kappa[VECTOR_DIM] = { KAPPA_DEFAULT[i][0], KAPPA_DEFAULT[i][1], KAPPA_DEFAULT[i][2] };
-		Roughs[i] = ROUGH_DEFAULT[i];
 
-		ImGui::InputFloat3("IOR", IOR);
-		ImGui::InputFloat3("Kappa", Kappa);
-		ImGui::SliderFloat("Roughness", &Roughs[i], 0.0f, 1.0f);
 
-		IORs[i] = Math::Vector3(IOR[0], IOR[1], IOR[2]);
-		Kappas[i] = Math::Vector3(Kappa[0], Kappa[1], Kappa[2]);
+		ImGui::DragFloat3(std::format("IOR Layer {0}", i).c_str(), IOR_DEFAULT[i],0.1, 0.0f);
+		ImGui::DragFloat3(std::format("Kappa Layer {0}", i).c_str(), KAPPA_DEFAULT[i], 0.1f, 0.0f);
+		ImGui::SliderFloat(std::format("Roughness Layer {0}", i).c_str(), &ROUGH_DEFAULT[i], 0.0f, 1.0f);
+
+		//IORs[i] = Math::Vector3(IOR_DEFAULT[i][0], IOR_DEFAULT[i][1], IOR_DEFAULT[i][2]);
+		//Kappas[i] = Math::Vector3(KAPPA_DEFAULT[i][0], KAPPA_DEFAULT[i][1], KAPPA_DEFAULT[i][2]);
 		
 	}
 
+	ImGui::DragInt("Number of Layers", &NumLayers, 1, 5);
+	NumLayers = std::max(0, std::min(NumLayers, max_layers));
+	ImGui::DragInt("BSDF Samples", &NumSamples, 1.0f, 1, 100);
 	ImGui::End();
 
 }

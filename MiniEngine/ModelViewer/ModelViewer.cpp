@@ -246,16 +246,27 @@ void ModelViewer::Update( float deltaT )
     else if (GameInput::IsFirstPressed(GameInput::kRShoulder))
         DebugZoom.Increment();
 
-    bool Lalt = GameInput::IsFirstPressed(GameInput::kKey_lalt);
+    bool Lalt = GameInput::IsFirstPressed(GameInput::kKey_lcontrol);
 
-    if (Lalt)
+    ImGui_ImplWin32_NewFrame();
+    ImGui_ImplDX12_NewFrame();
+    ImGui::NewFrame();
+
+    auto& io = ImGui::GetIO();
+
+    if (io.WantCaptureMouse || Lalt)
     {
-        CursorVisible = !CursorVisible;
-        ShowCursor(CursorVisible);
+        
+        ShowCursor(true);
     }
     else {
         m_CameraController->Update(deltaT);
+        ShowCursor(false);
     }
+
+
+    io.AddMouseButtonEvent(0, GameInput::IsPressed(GameInput::kMouse0));
+    
     
 
     GraphicsContext& gfxContext = GraphicsContext::Begin(L"Scene Update");
@@ -323,21 +334,34 @@ void ModelViewer::RenderScene( void )
         globals.SunIntensity = Vector3(Scalar(g_SunLightIntensity));
 
 
-        LayerConstants layers;
+        LayerConstants layers = { 0 };
         //init external media layer params.
-        layers.IORs[0] = Vector3(1.003f);
 
-        layers.Kappas[0] = Vector3(0.0f);
+        layers.IORs[0].xyz[0] = 1.003f;
+        layers.IORs[0].xyz[1] = 1.003f;
+        layers.IORs[0].xyz[2] = 1.003f;
 
-        layers.Roughs[0] = 1.0f;
-        layers.layers = TM2Resources::NUM_LAYERS;
+        layers.Kappas[0].xyz[0] = 0.0f;
+        layers.Kappas[0].xyz[1] = 0.0f;
+        layers.Kappas[0].xyz[2] = 0.0f;
+
+        layers.Roughs[0].x = 1.0f;
+        layers.layers = gui.NumLayers;
+        layers.num_samples = gui.NumSamples;
         
-        for (size_t i = 0; i < gui.IORs.size(); i++)
+        for (size_t i = 0; i < gui.NumLayers; i++)
         {
-            layers.IORs[i + 1] = gui.IORs[i];
+            layers.IORs[i + 1].xyz[0] = gui.IOR_DEFAULT[i][0];
+            layers.IORs[i + 1].xyz[1] = gui.IOR_DEFAULT[i][1];
+            layers.IORs[i + 1].xyz[2] = gui.IOR_DEFAULT[i][2];
 
-            layers.Kappas[i + 1] = gui.Kappas[i];
-            layers.Roughs[i + 1] = gui.Roughs[i];
+
+            layers.Kappas[i + 1].xyz[0] = gui.KAPPA_DEFAULT[i][0];
+            layers.Kappas[i + 1].xyz[1] = gui.KAPPA_DEFAULT[i][1];
+            layers.Kappas[i + 1].xyz[2] = gui.KAPPA_DEFAULT[i][2];
+
+
+            layers.Roughs[i + 1].x = gui.ROUGH_DEFAULT[i];
         }
 
 
@@ -418,11 +442,8 @@ void ModelViewer::RenderScene( void )
     else
         MotionBlur::RenderObjectBlur(gfxContext, g_VelocityBuffer);
 
-    ImGui_ImplWin32_NewFrame();
-    ImGui_ImplDX12_NewFrame();
-    ImGui::NewFrame();
 
-    gui.LayerUI(TM2Resources::NUM_LAYERS, TM2Resources::MAX_LAYERS - 1); //-1 to account for the external media.
+    gui.LayerUI(std::max(0,std::min(TM2Resources::MAX_LAYERS-1, gui.NumLayers)), TM2Resources::MAX_LAYERS - 1); //-1 to account for the external media.
 
 
     ImGui::Render();

@@ -8,9 +8,6 @@
 #include <vector>
 #include <wrl.h>
 
-static constexpr float IOR_DEFAULT[2][3] = { {1.0,1.0,1.0}, {1.5,1.5,1.5} };
-static constexpr float KAPPA_DEFAULT[2][3] = { {1.0f, 0.1f, 0.1f }, { 0.0f, 0.0f, 0.0f } };
-static constexpr float ROUGH_DEFAULT[2] = { 0.01f, 0.1f };
 
 class GUI
 {
@@ -18,7 +15,7 @@ public:
 	void Initialise(struct ID3D12Device* device, DescriptorHeap SRVDescriptorHeap);
 	void Teardown();
 
-	void LayerUI(uint32_t num_layers, uint32_t max_layers);
+	void LayerUI(int32_t num_layers, int32_t max_layers);
 
 	
 
@@ -27,6 +24,14 @@ public:
 	std::vector<float> Roughs = {0.01f, 0.1f};
 
 	DescriptorHeap FontHeap;
+
+	static constexpr size_t VECTOR_DIM = 3;
+	float IOR_DEFAULT[5][VECTOR_DIM] = { {1.0,1.0,1.0}, {1.5,1.5,1.5}, {1.0,1.0,1.0}, {1.0,1.0,1.0} };
+	float KAPPA_DEFAULT[5][VECTOR_DIM] = { {1.0f, 0.1f, 0.1f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } };
+	float ROUGH_DEFAULT[5] = { 0.01f, 0.1f, 0.0f, 0.0f };
+	int32_t NumSamples = 5;
+	int32_t NumLayers = 2;
+
 
 };
 

@@ -203,6 +203,7 @@ float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, floa
         weight_sum += weights[i];
     }
     
+    //scale and bias?
     float selected_weight = Hammersley * weight_sum - weights[0];
     int selection_index = 0;
     for (selection_index = 0; selected_weight > 0.f && selection_index < NumLayers; selection_index++)
@@ -211,11 +212,14 @@ float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, floa
     }
     
     
-    //sampling
+    //sampling - take random lobe for outgoing direction.
+    //should outgoing roughness be an average of all the sampled lobes?
+    //or should it just be the top lobe?? 
     
-    lobe_rough = hg_to_ggx(lobes[selection_index].asymmetry);
+    //lobe_rough = hg_to_ggx(lobes[selection_index].asymmetry);
+    float rough = hg_to_ggx(lobes[selection_index].asymmetry);
     
-    const float3 H = sample_GGX(samplePoint, lobe_rough, pdf);
+    const float3 H = sample_GGX(samplePoint, rough, pdf);
 
     rec.outgoing = reflectSpherical(rec.incident, H);
     rec.ior = 1.f;
@@ -228,13 +232,16 @@ float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, floa
     }
     
     //PDF
-    
+    lobe_rough = 0.0f;
     pdf = 0.0f;
     for (int i = 0; i < NumLayers; i++)
     {
         if (weights[i] > 0.0f)
         {
             const float rough = hg_to_ggx(lobes[i].asymmetry);
+            //compute outgoing lobes roughness as weighted average for IBL evaluation.
+            lobe_rough += rough * weights[i];
+            
             
                     
             float3 incoming = rec.incident;
@@ -254,6 +261,7 @@ float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, floa
 
         }
     }
+    
     pdf /= weight_sum;
     
     //Throughput
@@ -303,6 +311,7 @@ float compute_pdf(sample_record rec, int measure, float3 iors[LAYERS_MAX], float
     
 }
 
+
 float4 main(VSOutput vsOutput) : SV_Target0
 {
     float3 normal = normalize(vsOutput.normal);
@@ -330,29 +339,23 @@ float4 main(VSOutput vsOutput) : SV_Target0
     float accumulated_rough = 0.0f;
     float3 accumulated_sample_direction = 0.0f.xxx;
     
-    for (int i = 0; i < NumSamples; i++)
-    {
-        float2 samplePoint = Hammersley(i, NumSamples);
+   // for (int i = 0; i < NumSamples; i++)
+   {
+        float2 samplePoint = 0.f.xx; //Hammersley(i, NumSamples);
         float pdf;
-        float rough;
-        float3 sampleEnergy = sample(rec, pdf, rough, samplePoint, nrand(samplePoint), IORs, Kappas, Roughs);
+        float3 sampleEnergy = sample(rec, pdf, accumulated_rough, samplePoint, Hammersley(0, 5).y, IORs, Kappas, Roughs);
       
         float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(rec.outgoing));
         
         accumulated_energy += sampleEnergy;
-        accumulated_rough += rough;
-        accumulated_sample_direction += outgoingWS;
+        accumulated_sample_direction = outgoingWS;
         
        
     }
-    if (isnan(accumulated_energy.x) || isnan(accumulated_energy.y) || isnan(accumulated_energy.z) || isinf(accumulated_energy.x) || isinf(accumulated_energy.y) || isinf(accumulated_energy.z))
-    {
-        return float4(NAN_DEBUG, 1.0f);
-    }
     
-    float rough = accumulated_rough / NumSamples;
-    float3 energy = accumulated_energy / NumSamples;
-    float3 direction = accumulated_sample_direction / NumSamples;
+    float rough = accumulated_rough;
+    float3 energy = accumulated_energy;
+    float3 direction = accumulated_sample_direction;
     
     float lod = rough * IBLRange + IBLBias;
     float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, direction, lod);

@@ -36,11 +36,14 @@
     <None Include="Shaders\transfer_matrix\tensor3d.hlsli" />
     <None Include="Shaders\transfer_matrix\tm2_common.hlsli" />
     <None Include="Shaders\Common.hlsli" />
+    <None Include="Shaders\transfer_matrix\TransferMatrixCommon.hlsli" />
+    <None Include="Shaders\transfer_matrix\Constants.hlsli" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\transfer_matrix\TM2DielectricPS.hlsl" />
     <FxCompile Include="Shaders\DefaultVS.hlsl" />
     <FxCompile Include="Shaders\transfer_matrix\TM2OpaquePS.hlsl" />
+    <FxCompile Include="Shaders\transfer_matrix\TM6PS.hlsl" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="FGD.dds" />

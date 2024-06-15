@@ -61,7 +61,7 @@ void outgoing_lobes(float3 incident, float3 ior[LAYERS_MAX], float3 kappas[LAYER
     
     for (int i = 0; i < NumLayers; i++)
     {
-        if (ops[i].component_type == TM2_TYPE_DIELECTRICINTERFACE)
+        if (ops[i].component_type == TM_TYPE_DIELECTRICINTERFACE)
         {
             ior_ij = float3_average((ior[i + 1] / ior[i]));
             ior_ji = 1.0f / ior_ij;
@@ -127,7 +127,7 @@ float3 eval(sample_record rec, int measure, float3 iors[LAYERS_MAX], float3 kapp
         float3(0.0f, 0.0f, 0.0f); 
     }
     
-    if (measure != TM2_MEASURE_SOLID_ANGLE || rec.outgoing.z <= 0)
+    if (measure != TM_MEASURE_SOLID_ANGLE || rec.outgoing.z <= 0)
     {
         return EVAL_DEBUG;
     }
@@ -148,6 +148,7 @@ float3 eval(sample_record rec, int measure, float3 iors[LAYERS_MAX], float3 kapp
     const float3 ior_01 = iors[1] / iors[0];
     if (kappas[1].x + kappas[1].y + kappas[1].z == 0.0f)
     {
+        //should this be fresnel_dielectric_ext?
         F0 = fresnelDielectric(dot(rec.incident, H), float3_average(ior_01));
 
     }
@@ -212,6 +213,7 @@ float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, floa
     }
     
     
+    //either take lobe randomly, or sample all lobes.
     //sampling - take random lobe for outgoing direction.
     //should outgoing roughness be an average of all the sampled lobes?
     //or should it just be the top lobe?? 
@@ -224,7 +226,7 @@ float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, floa
     rec.outgoing = reflectSpherical(rec.incident, H);
     rec.ior = 1.f;
     rec.is_reflection_sample = false;
-    rec.sample_type = TM2_SAMPLE_TYPE_GLOSSY_REFLECTION;
+    rec.sample_type = TM_SAMPLE_TYPE_GLOSSY_REFLECTION;
     
     if (rec.outgoing.z <= 0.f || pdf <= 0.0f)
     {
@@ -263,10 +265,11 @@ float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, floa
     }
     
     pdf /= weight_sum;
+    lobe_rough /= weight_sum;
     
     //Throughput
     
-    float3 throughput = eval(rec, TM2_MEASURE_SOLID_ANGLE, iors, kappas, roughness);
+    float3 throughput = eval(rec, TM_MEASURE_SOLID_ANGLE, iors, kappas, roughness);
     
     return pdf > 0.f ? throughput / pdf : PDF_DEBUG;
 
@@ -274,7 +277,7 @@ float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, floa
 
 float compute_pdf(sample_record rec, int measure, float3 iors[LAYERS_MAX], float3 kappas[LAYERS_MAX], float alphas[LAYERS_MAX])
 {
-    if (measure != TM2_MEASURE_SOLID_ANGLE || rec.incident.z <= 0 || rec.outgoing.z <= 0)
+    if (measure != TM_MEASURE_SOLID_ANGLE || rec.incident.z <= 0 || rec.outgoing.z <= 0)
     {
         return 0.0f;
     }
@@ -332,7 +335,7 @@ float4 main(VSOutput vsOutput) : SV_Target0
 
         1.0f,
         true,
-        TM2_SAMPLE_TYPE_GLOSSY_REFLECTION
+        TM_SAMPLE_TYPE_GLOSSY_REFLECTION
     };
     
     float3 accumulated_energy = 0.0f.xxx;

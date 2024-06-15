@@ -15,7 +15,7 @@ public:
 	void Initialise(struct ID3D12Device* device, DescriptorHeap SRVDescriptorHeap);
 	void Teardown();
 
-	void LayerUI(int32_t num_layers, int32_t max_layers);
+	void LayerUI(int32_t num_layers, int32_t max_layers, bool UseTM6 = false);
 
 	
 
@@ -29,6 +29,13 @@ public:
 	float IOR_DEFAULT[5][VECTOR_DIM] = { {1.0,1.0,1.0}, {1.5,1.5,1.5}, {1.0,1.0,1.0}, {1.0,1.0,1.0} };
 	float KAPPA_DEFAULT[5][VECTOR_DIM] = { {1.0f, 0.1f, 0.1f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f } };
 	float ROUGH_DEFAULT[5] = { 0.01f, 0.1f, 0.0f, 0.0f };
+
+	float SIGMA_S_DEFAULT[5][VECTOR_DIM] = { 0 };
+	float SIGMA_K_DEFAULT[5][VECTOR_DIM] = { 0 };
+	float DEPTH_DEFAULT[5] = { 0 };
+	float G_DEFAULT[5] = { 0 };
+
+
 	int32_t NumSamples = 5;
 	int32_t NumLayers = 2;
 

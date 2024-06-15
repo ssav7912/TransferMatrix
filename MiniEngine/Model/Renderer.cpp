@@ -80,7 +80,7 @@ namespace Renderer
 void Renderer::Initialize(void)
 {
     ///TM2 PSOs
-    transfer_matrix.Initialise("FGD.dds", "tm_TIR.bin");
+    transfer_matrix.Initialise("FGD.dds", "tm_FGD.bin", "tm_TIR.bin");
 
 
     if (s_Initialized)
@@ -242,10 +242,10 @@ void Renderer::Initialize(void)
     Lighting::InitializeResources();
 
     // Allocate a descriptor table for the common textures
-    m_CommonTextures = s_TextureHeap.Alloc(8 + 2);
+    m_CommonTextures = s_TextureHeap.Alloc(8 + 3);
 
-    uint32_t DestCount = 8 + 2;
-    uint32_t SourceCounts[] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+    uint32_t DestCount = 8 + 3;
+    uint32_t SourceCounts[] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
     D3D12_CPU_DESCRIPTOR_HANDLE SourceTextures[] =
     {
@@ -258,7 +258,9 @@ void Renderer::Initialize(void)
         Lighting::m_LightGrid.GetSRV(),
         Lighting::m_LightGridBitMask.GetSRV(),
         transfer_matrix.TIR_LUT.GetSRV(),
-        transfer_matrix.FGD_LUT.GetSRV()
+        transfer_matrix.FGD_LUT.GetSRV(),
+        transfer_matrix.FGD_4D_LUT.GetSRV(),
+        
     };
 
     g_Device->CopyDescriptors(1, &m_CommonTextures, &DestCount, DestCount, SourceTextures, SourceCounts, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);

@@ -140,7 +140,7 @@ void outgoing_lobes(float3 incident, float3 iors[LAYERS_MAX], float alphas[LAYER
 
 float3 eval(sample_record rec, int measure, float3 iors[LAYERS_MAX], float alphas[LAYERS_MAX])
 {
-    if (measure != TM2_MEASURE_SOLID_ANGLE || rec.incident.z > 0)
+    if (measure != TM_MEASURE_SOLID_ANGLE || rec.incident.z > 0)
     {
         return EVAL_DEBUG;
     }
@@ -260,7 +260,7 @@ float3 sample(inout sample_record rec, float2 samplePos, float Hammersley, float
     rec.outgoing = sel_wo;
     rec.ior = float3_average(iors[reflection ? 0 : NUM_LAYERS]);
     rec.is_reflection_sample = reflection ? false : true;
-    rec.sample_type = reflection ? TM2_SAMPLE_TYPE_GLOSSY_REFLECTION : TM2_SAMPLE_TYPE_GLOSSY_TRANSMISSION;
+    rec.sample_type = reflection ? TM_SAMPLE_TYPE_GLOSSY_REFLECTION : TM_SAMPLE_TYPE_GLOSSY_TRANSMISSION;
  
     
     /* PDF */
@@ -302,7 +302,7 @@ float3 sample(inout sample_record rec, float2 samplePos, float Hammersley, float
     
     /* THROUGHPUT */
     
-    float3 throughput = eval(rec, TM2_MEASURE_SOLID_ANGLE, iors, alphas);
+    float3 throughput = eval(rec, TM_MEASURE_SOLID_ANGLE, iors, alphas);
     
     
     return pdf > 0.f ? throughput / pdf : PDF_DEBUG;
@@ -351,7 +351,7 @@ float4 main(VSOutput vsOutput) : SV_Target0
         mul(WorldToTangent, -ViewerRay),
         1.333f,
         true,
-        TM2_SAMPLE_TYPE_GLOSSY_REFLECTION
+        TM_SAMPLE_TYPE_GLOSSY_REFLECTION
     };
     
     float3 accum = 0.0f.xxx;

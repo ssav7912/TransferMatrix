@@ -34,7 +34,7 @@ void GUI::Teardown()
 
 }
 
-void GUI::LayerUI(int32_t num_layers, int32_t max_layers)
+void GUI::LayerUI(int32_t num_layers, int32_t max_layers, bool UseTM6)
 {
 	num_layers = std::max(0,std::min(num_layers, max_layers));
 
@@ -50,9 +50,24 @@ void GUI::LayerUI(int32_t num_layers, int32_t max_layers)
 		ImGui::DragFloat3(std::format("Kappa Layer {0}", i).c_str(), KAPPA_DEFAULT[i], 0.1f, 0.0f);
 		ImGui::SliderFloat(std::format("Roughness Layer {0}", i).c_str(), &ROUGH_DEFAULT[i], 0.0f, 1.0f);
 
+		if (UseTM6)
+		{
+			ImGui::DragFloat3(std::format("Sigma S Layer {0}", i).c_str(), SIGMA_S_DEFAULT[i], 0.1, 0.0f);
+			ImGui::DragFloat3(std::format("Sigma K Layer {0}", i).c_str(), SIGMA_K_DEFAULT[i], 0.1, 0.0f);
+			ImGui::SliderFloat(std::format("Depth Layer {0}", i).c_str(), &DEPTH_DEFAULT[i], 0.1, 0.0f);
+			ImGui::SliderFloat(std::format("Gs Layer {0}", i).c_str(), &G_DEFAULT[i], 0.1, 0.0f);
+		}
+
 		//IORs[i] = Math::Vector3(IOR_DEFAULT[i][0], IOR_DEFAULT[i][1], IOR_DEFAULT[i][2]);
 		//Kappas[i] = Math::Vector3(KAPPA_DEFAULT[i][0], KAPPA_DEFAULT[i][1], KAPPA_DEFAULT[i][2]);
-		
+		IOR_DEFAULT[i][0] = std::max(0.0f, IOR_DEFAULT[i][0]);
+		IOR_DEFAULT[i][1] = std::max(0.0f, IOR_DEFAULT[i][1]);
+		IOR_DEFAULT[i][2] = std::max(0.0f, IOR_DEFAULT[i][2]);
+
+		KAPPA_DEFAULT[i][0] = std::max(0.0f, KAPPA_DEFAULT[i][0]);
+		KAPPA_DEFAULT[i][1] = std::max(0.0f, KAPPA_DEFAULT[i][1]);
+		KAPPA_DEFAULT[i][2] = std::max(0.0f, KAPPA_DEFAULT[i][2]);
+
 	}
 
 	ImGui::DragInt("Number of Layers", &NumLayers, 1, 5);

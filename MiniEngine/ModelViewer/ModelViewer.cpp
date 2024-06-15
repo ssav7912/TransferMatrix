@@ -345,22 +345,44 @@ void ModelViewer::RenderScene( void )
         layers.Kappas[0].xyz[1] = 0.0f;
         layers.Kappas[0].xyz[2] = 0.0f;
 
+        layers.Sigma_S[0].xyz[0] = 0.0f;
+        layers.Sigma_S[0].xyz[1] = 0.0f;
+        layers.Sigma_S[0].xyz[2] = 0.0f;
+                       
+        layers.Sigma_K[0].xyz[0] = 0.0f;
+        layers.Sigma_K[0].xyz[1] = 0.0f;
+        layers.Sigma_K[0].xyz[2] = 0.0f;
+
+        layers.Depths[0].x = 0.0f;
+        layers.G[0].x = 0.0f;
+
         layers.Roughs[0].x = 1.0f;
         layers.layers = gui.NumLayers;
         layers.num_samples = gui.NumSamples;
         
+        constexpr float epsilon = std::numeric_limits<float>::epsilon(); 
+
         for (size_t i = 0; i < gui.NumLayers; i++)
         {
-            layers.IORs[i + 1].xyz[0] = gui.IOR_DEFAULT[i][0];
-            layers.IORs[i + 1].xyz[1] = gui.IOR_DEFAULT[i][1];
-            layers.IORs[i + 1].xyz[2] = gui.IOR_DEFAULT[i][2];
+            layers.IORs[i + 1].xyz[0] = std::max(epsilon, gui.IOR_DEFAULT[i][0]);
+            layers.IORs[i + 1].xyz[1] = std::max(epsilon, gui.IOR_DEFAULT[i][1]);
+            layers.IORs[i + 1].xyz[2] = std::max(epsilon, gui.IOR_DEFAULT[i][2]);
 
 
-            layers.Kappas[i + 1].xyz[0] = gui.KAPPA_DEFAULT[i][0];
-            layers.Kappas[i + 1].xyz[1] = gui.KAPPA_DEFAULT[i][1];
-            layers.Kappas[i + 1].xyz[2] = gui.KAPPA_DEFAULT[i][2];
+            layers.Kappas[i + 1].xyz[0] = std::max(epsilon,gui.KAPPA_DEFAULT[i][0]);
+            layers.Kappas[i + 1].xyz[1] = std::max(epsilon,gui.KAPPA_DEFAULT[i][1]);
+            layers.Kappas[i + 1].xyz[2] = std::max(epsilon,gui.KAPPA_DEFAULT[i][2]);
 
+            layers.Sigma_S[i + 1].xyz[0] = gui.SIGMA_S_DEFAULT[i][0];
+            layers.Sigma_S[i + 1].xyz[1] = gui.SIGMA_S_DEFAULT[i][1];
+            layers.Sigma_S[i + 1].xyz[2] = gui.SIGMA_S_DEFAULT[i][2];
+           
+            layers.Sigma_K[i + 1].xyz[0] = gui.SIGMA_K_DEFAULT[i][0];
+            layers.Sigma_K[i + 1].xyz[1] = gui.SIGMA_K_DEFAULT[i][1];
+            layers.Sigma_K[i + 1].xyz[2] = gui.SIGMA_K_DEFAULT[i][2];
 
+            layers.Depths[i + 1].x = gui.DEPTH_DEFAULT[i];
+            layers.G[i + 1].x = gui.G_DEFAULT[i];
             layers.Roughs[i + 1].x = gui.ROUGH_DEFAULT[i];
         }
 

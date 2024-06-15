@@ -38,6 +38,7 @@
     <None Include="Shaders\Common.hlsli" />
     <None Include="Shaders\transfer_matrix\TransferMatrixCommon.hlsli" />
     <None Include="Shaders\transfer_matrix\Constants.hlsli" />
+    <None Include="Tm2.md" />
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="Shaders\transfer_matrix\TM2DielectricPS.hlsl" />

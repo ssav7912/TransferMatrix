@@ -685,8 +685,8 @@ float4 main(VSOutput vsOutput) : SV_Target0
         
         
         
-        float3 sampleEnergy = sample(rec, pdf, accumulated_rough, samplePoint, Hammersley(0, 5).y, props);
-      
+        //float3 sampleEnergy = sample(rec, pdf, accumulated_rough, samplePoint, Hammersley(0, 5).y, props);
+        float3 sampleEnergy = 0.0f;
         float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(rec.outgoing));
         
         accumulated_energy += sampleEnergy;

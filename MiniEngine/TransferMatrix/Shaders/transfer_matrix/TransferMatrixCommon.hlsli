@@ -468,7 +468,7 @@ float smithG2(float3 V, float3 N, float3 L, float rough)
 float3 Dim4ToDim3(float4 coord, uint dimension)
 {
     
-    return (coord.x, coord.y, coord.z + (coord.w * dimension));
+    return float3(coord.x, coord.y, coord.z + (coord.w * dimension));
 }
 
 float3 sample_FGD(float cti, float alpha, float3 ior, float3 kappa)

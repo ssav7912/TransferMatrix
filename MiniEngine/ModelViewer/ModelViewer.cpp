@@ -369,9 +369,9 @@ void ModelViewer::RenderScene( void )
             layers.IORs[i + 1].xyz[2] = std::max(epsilon, gui.IOR_DEFAULT[i][2]);
 
 
-            layers.Kappas[i + 1].xyz[0] = std::max(epsilon,gui.KAPPA_DEFAULT[i][0]);
-            layers.Kappas[i + 1].xyz[1] = std::max(epsilon,gui.KAPPA_DEFAULT[i][1]);
-            layers.Kappas[i + 1].xyz[2] = std::max(epsilon,gui.KAPPA_DEFAULT[i][2]);
+            layers.Kappas[i + 1].xyz[0] = std::max(0.f,gui.KAPPA_DEFAULT[i][0]);
+            layers.Kappas[i + 1].xyz[1] = std::max(0.f,gui.KAPPA_DEFAULT[i][1]);
+            layers.Kappas[i + 1].xyz[2] = std::max(0.f,gui.KAPPA_DEFAULT[i][2]);
 
             layers.Sigma_S[i + 1].xyz[0] = gui.SIGMA_S_DEFAULT[i][0];
             layers.Sigma_S[i + 1].xyz[1] = gui.SIGMA_S_DEFAULT[i][1];

@@ -31,7 +31,7 @@ struct sample_record
 
 
 //Lookup table for Total Internal Reflection
-Texture3D<float3> TIR_LUT : register(t18);
+Texture3D<float> TIR_LUT : register(t18);
 
 //compile time switch for (Karis 2013). split sum FGD approx, or the (Belcour 2018). FGD LUT.
 #if USE_FAST_FGD == 1
@@ -366,63 +366,11 @@ float3 sample_GGX(float2 sample, float alpha, out float pdf)
     float temp = 1.0f + tanthetaMSqr / alphasquare;
     
     //TODO: clamp?
-    pdf = (1 / PI) / (alphasquare * cosThetaM * cosThetaM * cosThetaM * temp * temp);
+    pdf = (1.0f / PI) / (alphasquare * cosThetaM * cosThetaM * cosThetaM * temp * temp);
 
     float sinThetaM = sqrt(max(0.0f, 1 - cosThetaM * cosThetaM));
     
     return float3(sinThetaM * cosPhiM, sinThetaM * sinPhiM, cosThetaM);
-}
-
-float3 sample_GGX_Visible(float3 incident, float2 samplePoint, float rough)
-{
-    float3 incident_weighted = normalize(float3(rough * incident.x, rough * incident.y, incident.z));
-    
-    float theta = 0.0f;
-    float phi = 0.0f;
-    
-    if (incident.z < 0.99999f)
-    {
-        theta = acos(incident_weighted);
-        phi = atan2(incident_weighted.y, incident_weighted.x);
-    }
-    
-    float sinphi;
-    float cosphi;
-    
-    sincos(phi, sinphi, cosphi);
-    
-    float2 slope = 0.0f;
-    //sampleVisible11(theta, sample);
-    
-    slope = float2(cosphi * slope.x - sinphi * slope.y,
-                    sinphi * slope.x + cosphi * slope.y);
-    
-    slope.x *= rough;
-    slope.y *= rough;
-    
-    float norm = 1.0f / sqrt(slope.x * slope.x + slope.y * slope.y + 1.0f);
-
-    return float3(-slope.x * norm, -slope.y * norm, norm);
-}
-
-float D_GGX(float3 m, float alpha)
-{
-   
-    
-    float costheta2 = cosTheta2(m);
-    float beckmann = saturate(((m.x * m.x) / (alpha * alpha) + (m.y * m.y) / (alpha * alpha)) / costheta2);
-    
-    float root = (1.0f + beckmann) * costheta2;
-    return saturate(1.0f / (PI * alpha * alpha * root * root));
-
-}
-
-//Karis 2013 distribution.
-float D_GGX_Karis(float NdotH, float rough)
-{
-    float rough_square = rough * rough;
-    float f = (NdotH * NdotH) * (rough_square - 1.0) + 1.0;
-    return rough_square / (PI * f * f);
 }
 
 //assume isotropic
@@ -445,6 +393,125 @@ float smithG1(float3 v, float3 m, float alpha)
                     //hypot2
     return saturate(2.0f / (1.0f + 1.0f * 1.0f + root * root));
 
+}
+
+
+
+float D_GGX(float3 m, float alpha)
+{
+   if (m.z <= 0.0f)
+    {
+        return 0.0f;
+    }
+    alpha = max(EPSILON, alpha);
+    
+    float costheta2 = cosTheta2(m);
+    float beckmann = (((m.x * m.x) / (alpha * alpha) + (m.y * m.y) / (alpha * alpha)) / costheta2);
+    
+    float root = (1.0f + beckmann) * costheta2;
+    return (1.0f / (PI * alpha * alpha * root * root));
+
+}
+
+float3 sample_GGX_Visible(float3 incident, float2 samplePoint, float rough, out float pdf)
+{
+    float3 incident_weighted = normalize(float3(rough * incident.x, rough * incident.y, incident.z));
+    
+    float theta = 0.0f;
+    float phi = 0.0f;
+    
+    if (incident.z < 0.99999f)
+    {
+        theta = acos(incident_weighted.z);
+        phi = atan2(incident_weighted.y, incident_weighted.x);
+    }
+    
+    float sinphi;
+    float cosphi;
+    
+    sincos(phi, sinphi, cosphi);
+    float2 slope;
+    //sample visible
+    {
+        static const float SQRT_PI_INV = 1.0f / sqrt(PI);
+        
+        if (theta < 1e-4f)
+        {
+            float sinphi = 0.0f;
+            float cosphi = 0.0f;
+            
+            float r = sqrt(samplePoint.x / (1 - samplePoint.x)); //TODO: safe sqrt
+            sincos(2 * PI * samplePoint.y, sinphi, cosphi);
+            slope = float2(r * cosphi, r * sinphi);
+        }
+        
+        float tantheta = tan(theta);
+        float a = 1 / tantheta;
+        float G1 = 2.0f / (1.0f + sqrt(1.0f + 1.0f / (a * a)));
+        
+        float A = 2.0f * samplePoint.x / G1 - 1.0f;
+        if( abs(A) == 1.0f)
+        {
+            A -= sign(A) * EPSILON;
+        }
+        float tmp = 1.0f / (A * A - 1.0f);
+        float B = tantheta;
+        float D = sqrt(B * B * tmp * tmp - (A * A - B * B) * tmp);
+        float slope_x_1 = B * tmp - D;
+        float slope_X_2 = B * tmp + D;
+        
+        slope.x = (A < 0.0f || slope_X_2 > 1.0f / tantheta) ? slope_x_1 : slope_X_2;
+        
+        float S = 0.0f;
+        if (samplePoint.y > 0.5f)
+        {
+            S = 1.0f;
+            samplePoint.y = 2.0f * (samplePoint.y - 0.5f);
+        }
+        else
+        {
+            S = -1.0f;
+            samplePoint.y = 2.0f * (0.5f - samplePoint.y);
+        }
+        
+        float z = (samplePoint.y * (samplePoint.y * (samplePoint.y * (-0.365728915865723f) + 0.790235037209296f) -
+                            0.424965825137544f) + 0.000152998850436920f) /
+                        (samplePoint.y * (samplePoint.y * (samplePoint.y * (samplePoint.y * 0.169507819808272f - 0.397203533833404f) -
+                            0.232500544458471f) + 1.0f) - 0.539825872510702f);
+
+        slope.y = S * z * sqrt(1.0f + slope.x * slope.x);
+    }
+    
+    //pdf
+    {
+        if (incident.z == 0.0f)
+        {
+            pdf = 0.0f;
+        }
+        else
+        {
+            static const float3 M = float3(0.0f, 0.0f, 1.0f);
+            pdf = smithG1(incident, M, rough) * abs(dot(incident, M) * D_GGX(M, rough)) / abs(incident.z);
+        }
+    }
+    
+    slope = float2(cosphi * slope.x - sinphi * slope.y,
+                    sinphi * slope.x + cosphi * slope.y);
+    
+    slope.x *= rough;
+    slope.y *= rough;
+    
+    float norm = 1.0f / sqrt(slope.x * slope.x + slope.y * slope.y + 1.0f);
+
+    return float3(-slope.x * norm, -slope.y * norm, norm);
+}
+
+//Karis 2013 distribution.
+float D_GGX_Karis(float NdotH, float rough)
+{
+    float rough_square = rough * rough;
+    float f = (NdotH * NdotH) * (rough_square - 1.0) + 1.0;
+    return rough_square / (PI * f * f);
 }
 
 

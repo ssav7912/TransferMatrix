@@ -53,8 +53,8 @@ void outgoing_lobes(float3 incident, float3 ior[LAYERS_MAX], float3 kappas[LAYER
     };
     
     float2x2 asymmetry_0i = float2x2(
-                               1, 0,
-                               0, 1);
+                               1.0f, 0.0f,
+                               0.0f, 1.0f);
     
     
     components_transfer_factors(incident, ior, kappas, roughness, ops);
@@ -198,7 +198,7 @@ float3 eval_lobe(sample_record rec, henyey_greenstein lobe)
     return throughput;
 }
 
-float3 sample_preintegrated(inout sample_record rec, out float pdf, float3x3 TangentToWorld, float3 iors[LAYERS_MAX], float3 kappas[LAYERS_MAX], float roughs[LAYERS_MAX])
+float3 sample_preintegrated(inout sample_record rec, out float pdf, float2 samplePoint, float3x3 TangentToWorld, float3 iors[LAYERS_MAX], float3 kappas[LAYERS_MAX], float roughs[LAYERS_MAX])
 {
     if (rec.incident.z < 0)
     {
@@ -222,8 +222,9 @@ float3 sample_preintegrated(inout sample_record rec, out float pdf, float3x3 Tan
         
         {
             float ggx_pdf = 0.0f;
-            const float2 samplePoint = 0.f.xx;
-            const float3 H = sample_GGX(samplePoint, rough, ggx_pdf);
+            const float2 spoint = Hammersley(i, NumLayers);
+            const float3 H = sample_GGX_Visible(rec.incident, spoint, rough, ggx_pdf); 
+            
             rec.outgoing = reflectSpherical(rec.incident, H);
     
             if (rec.outgoing.z <= 0.0f || ggx_pdf <= 0.0f)
@@ -294,7 +295,7 @@ float3 sample_preintegrated(inout sample_record rec, out float pdf, float3x3 Tan
         
     pdf /= weight_sum;
    
-    return pdf > 0.0f ? throughput / pdf : PDF_DEBUG; 
+    return pdf > 0.0f ? throughput : PDF_DEBUG; 
 }
 
 float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, float2 samplePoint, float Hammersley, float3 iors[LAYERS_MAX], float3 kappas[LAYERS_MAX], float roughness[LAYERS_MAX])
@@ -335,8 +336,9 @@ float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, floa
     
     //lobe_rough = hg_to_ggx(lobes[selection_index].asymmetry);
     float rough = hg_to_ggx(lobes[selection_index].asymmetry);
+    lobe_rough = rough;
     
-    const float3 H = sample_GGX(samplePoint, rough, pdf);
+    const float3 H = sample_GGX_Visible(rec.incident, samplePoint, rough, pdf);
 
     rec.outgoing = reflectSpherical(rec.incident, H);
     rec.ior = 1.f;
@@ -349,15 +351,15 @@ float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, floa
     }
     
     //PDF
-    lobe_rough = 0.0f;
+    //lobe_rough = 0.0f;
     pdf = 0.0f;
-    for (int i = 0; i < NumLayers; i++)
+    for (int j = 0; j < NumLayers; j++)
     {
-        if (weights[i] > 0.0f)
+        if (weights[j] > 0.0f)
         {
-            const float rough = hg_to_ggx(lobes[i].asymmetry);
+            const float rough = hg_to_ggx(lobes[j].asymmetry);
             //compute outgoing lobes roughness as weighted average for IBL evaluation.
-            lobe_rough += rough * weights[i];
+            //lobe_rough += rough * weights[j];
             
             
                     
@@ -373,14 +375,14 @@ float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, floa
         
             const float D = D_GGX(H, rough);
         
-            pdf += weights[i] * G1 * D / (4.0f * incoming.z);
+            pdf += weights[j] * G1 * D / (4.0f * incoming.z);
         
 
         }
     }
     
     pdf /= weight_sum;
-    lobe_rough /= weight_sum;
+    //lobe_rough /= weight_sum;
     
     //Throughput
     
@@ -417,15 +419,25 @@ float4 main(VSOutput vsOutput) : SV_Target0
     
     float pdf;   
     float out_rough;
-    const float3 energy = sample(rec, pdf, out_rough, 0.f.xxx, 0.f.xxx, IORs, Kappas, Roughs);
-    const float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(rec.outgoing));
-    const float LOD = out_rough * IBLRange + IBLBias;
-    const float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, outgoingWS, LOD);
     
-    float3 output = energy * IBLSample;
+    float3 accumulated_energy = 0.0f;
+    for (int i = 0; i < NumSamples; i++)
+    {
+        
+        float2 SamplePoint = Hammersley(i, NumSamples);
+        const float3 energy = sample(rec, pdf, out_rough, SamplePoint, SamplePoint.y, IORs, Kappas, Roughs);
+        const float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(rec.outgoing));
+        const float LOD = out_rough * IBLRange + IBLBias;
+        const float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, outgoingWS, LOD);
+        accumulated_energy += energy * IBLSample;
+    }
+    float2 samplePoint = Hammersley(1,1);
+    //float3 output = sample_preintegrated(rec, pdf, 0.0f.xx , TangentToWorld, IORs, Kappas, Roughs);
+    float3 output = accumulated_energy / NumSamples;
+   
     
+   //return float4(lobes[1].asymmetry.xxx, 1.0f);
     
-    //float3 output = sample_preintegrated(rec, pdf, TangentToWorld, IORs, Kappas, Roughs);
     
 	
     return float4(output, 1.0f);

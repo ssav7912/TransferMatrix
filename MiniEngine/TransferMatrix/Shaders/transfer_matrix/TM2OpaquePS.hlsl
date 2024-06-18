@@ -198,7 +198,7 @@ float3 eval_lobe(sample_record rec, henyey_greenstein lobe)
     return throughput;
 }
 
-float3 sample_preintegrated(inout sample_record rec, out float pdf, float2 samplePoint, float3x3 TangentToWorld, float3 iors[LAYERS_MAX], float3 kappas[LAYERS_MAX], float roughs[LAYERS_MAX])
+float3 sample_preintegrated(inout sample_record rec, out float pdf, float3x3 TangentToWorld, float3 iors[LAYERS_MAX], float3 kappas[LAYERS_MAX], float roughs[LAYERS_MAX])
 {
     if (rec.incident.z < 0)
     {
@@ -210,28 +210,49 @@ float3 sample_preintegrated(inout sample_record rec, out float pdf, float2 sampl
     outgoing_lobes(rec.incident, iors, kappas, roughs, lobes);
     
 
-    
-    float3 throughput = EVAL_DEBUG;
+    float3 IBLSamples = 0.f.xxx;
+    float3 throughput = 0.0f;
     float weight_sum = 0.0f;
+    
+    const float3 H = float3(0.f, 0.f, 1.f); //mirror reflection about normal, 
+            //as using preintegrated lighting.
+    rec.outgoing = reflectSpherical(rec.incident, H);
+    
+    if (rec.outgoing.z <= 0.0f)
+    {
+      return EVAL_DEBUG;
+    }
+    
+    
+    //top reflection correction. [Bati 2019]
+        
+    //const float3 H = normalize(rec.incident + rec.outgoing);
+    const float G2_0 = smithG(rec.incident, rec.outgoing, H, roughs[1]);
+    const float D0_0 = D_GGX(H, roughs[1]);
+    float3 F0 = 0.0f.xxx;
+    const float3 ior_01 = iors[1] / iors[0];
+    if (isZero(kappas[1]))
+    {
+        F0 = fresnelDielectric(dot(rec.incident, H), float3_average(ior_01));
+    }
+    else
+    {
+        F0 = fresnelConductorExact(dot(rec.incident, H), ior_01, kappas[1] / iors[0]);
+    }
+    throughput += F0 * G2_0 * D0_0 / (4.0f * rec.incident.z);
+    
+    const float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(rec.outgoing));
+    const float BottomRough = roughs[1];
+    const float BottomLOD = BottomRough * IBLRange + IBLBias;
+    IBLSamples += radianceIBLTexutre.SampleLevel(cubeMapSampler, outgoingWS, BottomLOD);
+    
     for (int i = 0; i < NumLayers; i++)
     {
         float3 lobe_throughput = 0.0f;
         float lobe_weight = float3_average(lobes[i].norm);
         weight_sum += lobe_weight;
         const float rough = hg_to_ggx(lobes[i].asymmetry);
-        
-        {
-            float ggx_pdf = 0.0f;
-            const float2 spoint = Hammersley(i, NumLayers);
-            const float3 H = sample_GGX_Visible(rec.incident, spoint, rough, ggx_pdf); 
-            
-            rec.outgoing = reflectSpherical(rec.incident, H);
-    
-            if (rec.outgoing.z <= 0.0f || ggx_pdf <= 0.0f)
-            {
-                continue;
-            }
-        }
+       
     
 
         
@@ -256,46 +277,28 @@ float3 sample_preintegrated(inout sample_record rec, out float pdf, float2 sampl
 
         }
 
-        if (i == 0)
-        {
-                    
-            //top reflection correction. [Bati 2019]
-       
-            const float3 H = normalize(rec.incident + rec.outgoing);
-            const float G2_0 = smithG(rec.incident, rec.outgoing, H, roughs[1]);
-            const float D0_0 = D_GGX(H, roughs[1]);
-            float3 F0;
-            const float3 ior_01 = iors[1] / iors[0];
-            if (isZero(kappas[1]))
-            {
-                F0 = fresnelDielectric(dot(rec.incident, H), float3_average(ior_01));
-            }
-            else
-            {
-                F0 = fresnelConductorExact(dot(rec.incident, H), ior_01, kappas[1] / iors[0]);
-            }
-            lobe_throughput += F0 * G2_0 * D0_0 / (4.0f * rec.incident.z);
-        }
+
         
         
         //only evaluate layers when not in air-substrate interface.
-        if (i >= 0)
+        if (i >= 1)
         {
             //throughput
             lobe_throughput += eval_lobe(rec, lobes[i]);
+            //sample the IBL.
+
+            throughput += lobe_throughput;
+            float LOD = rough * IBLRange + IBLBias;
+            const float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, outgoingWS, LOD);
+            IBLSamples += IBLSample;
         }
-        //sample the IBL.
-        const float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(rec.outgoing));
-        float LOD = rough * IBLRange + IBLBias;
-        const float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, outgoingWS, LOD);
-        lobe_throughput *= IBLSample;
-        throughput += lobe_throughput;
+ 
+
     }
 
-        
     pdf /= weight_sum;
    
-    return pdf > 0.0f ? throughput : PDF_DEBUG; 
+    return pdf > 0.0f ? (throughput * IBLSamples) / pdf: PDF_DEBUG;
 }
 
 float3 sample(inout sample_record rec, out float pdf, out float lobe_rough, float2 samplePoint, float Hammersley, float3 iors[LAYERS_MAX], float3 kappas[LAYERS_MAX], float roughness[LAYERS_MAX])
@@ -421,22 +424,9 @@ float4 main(VSOutput vsOutput) : SV_Target0
     float out_rough;
     
     float3 accumulated_energy = 0.0f;
-    for (int i = 0; i < NumSamples; i++)
-    {
-        
-        float2 SamplePoint = Hammersley(i, NumSamples);
-        const float3 energy = sample(rec, pdf, out_rough, SamplePoint, SamplePoint.y, IORs, Kappas, Roughs);
-        const float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(rec.outgoing));
-        const float LOD = out_rough * IBLRange + IBLBias;
-        const float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, outgoingWS, LOD);
-        accumulated_energy += energy * IBLSample;
-    }
-    float2 samplePoint = Hammersley(1,1);
-    //float3 output = sample_preintegrated(rec, pdf, 0.0f.xx , TangentToWorld, IORs, Kappas, Roughs);
-    float3 output = accumulated_energy / NumSamples;
    
+    float3 output = sample_preintegrated(rec, pdf, TangentToWorld, IORs, Kappas, Roughs);
     
-   //return float4(lobes[1].asymmetry.xxx, 1.0f);
     
     
 	

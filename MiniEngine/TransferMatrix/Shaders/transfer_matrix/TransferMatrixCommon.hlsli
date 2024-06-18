@@ -377,13 +377,13 @@ float3 sample_GGX(float2 sample, float alpha, out float pdf)
 float smithG1(float3 v, float3 m, float alpha)
 {
     //v.z == Frame::cosTheta
-    if (dot(v, m) * v.z <= 0)
+    if (dot(v, m) * v.z <= 0.0f)
     {
         return 0.0f;
     }
     
     float tantheta = abs(tanTheta(v));
-    if (tantheta == 0.0f) //TODO: almost equal op...
+    if (tantheta <= 0.0f) //TODO: almost equal op...
     {
         return 1.0f;
     }

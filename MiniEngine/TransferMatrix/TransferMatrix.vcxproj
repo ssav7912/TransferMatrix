@@ -150,7 +150,7 @@
       <ShaderModel>6.5</ShaderModel>
       <VariableName>g_p%(Filename)</VariableName>
       <HeaderFileOutput>$(SolutionDir)..\Build\$(Platform)\$(Configuration)\Output\$(ProjectName)\CompiledShaders\%(Filename).h</HeaderFileOutput>
-      <PreprocessorDefinitions>USE_FAST_FGD=1</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_FAST_FGD=0</PreprocessorDefinitions>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>

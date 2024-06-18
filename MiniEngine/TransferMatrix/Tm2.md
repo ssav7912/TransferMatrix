@@ -8,8 +8,7 @@ The core of this work so far is reimplementing the 2-flux
 transfer matrix model as a pixel shader for a forward rendered raster engine written with DirectX 12. 
 The two-flux model tracks the reflected and transmitted flux occuring at interface boundaries between media in
 a 2x2 matrix. Therefore, the reflected and transmitted light energy for a stack of interfaces may be approximated by
-multiplying their associated transfer matrices together. The authors adapt Belcour's multi-lobe statistics in "Efficient rendering of layered materials using an atomic decom
-position with statistical operators." for transfer matrices by approximating the statistics with the Henyey-Greenstein phase function, which is stable under convolution.
+multiplying their associated transfer matrices together. The authors adapt Belcour's multi-lobe statistics in "Efficient rendering of layered materials using an atomic decomposition with statistical operators." for transfer matrices by approximating the statistics with the Henyey-Greenstein phase function, which is stable under convolution.
 
 
 ![Coating.png](Coating.png)
@@ -53,13 +52,13 @@ what is employed in the Substrate framework (De Rousiers et al, 2023).
 It is possible too that I should be weighting each lobes IBL sample direction by the outgoing mean, so that specular highlights decorrelate as should happen in a multi layer material. 
 
 ### References
-Laurent Belcour, Mégane Bati, and Pascal Barla. 2020. Bringing an Accurate Fresnel to Real-Time Rendering: a Preintegrable Decomposition. In ACM SIGGRAPH 2020 Talks (SIGGRAPH '20). Association for Computing Machinery, New York, NY, USA, Article 76, 1–2. https://doi.org/10.1145/3388767.3407325
+Laurent Belcour, MÃ©gane Bati, and Pascal Barla. 2020. Bringing an Accurate Fresnel to Real-Time Rendering: a Preintegrable Decomposition. In ACM SIGGRAPH 2020 Talks (SIGGRAPH '20). Association for Computing Machinery, New York, NY, USA, Article 76, 1â€“2. https://doi.org/10.1145/3388767.3407325
 
 Laurent Belcour. 2018. Efficient rendering of layered materials using an atomic decom
 position with statistical operators. ACM Transactions on Graphics (TOG) 37, 4 (2018),
  73.
 
-Joël Randrianandrasana, Patrick Callet, and Laurent Lucas. 2021. Transfer matrix based layered materials rendering. ACM Trans. Graph. 40, 4, Article 177 (August 2021), 16 pages. https://doi.org/10.1145/3450626.3459859
+JoÃ«l Randrianandrasana, Patrick Callet, and Laurent Lucas. 2021. Transfer matrix based layered materials rendering. ACM Trans. Graph. 40, 4, Article 177 (August 2021), 16 pages. https://doi.org/10.1145/3450626.3459859
 
 de Vries, J. (2020). Learn OpenGL. Learn modern OpenGL graphics programming in a step-by-step fashion. https://learnopengl.com/PBR/IBL/Specular-IBL      
 

@@ -1,4 +1,4 @@
-#include "TM2Resources.h"
+#include "TransferMatrixResources.h"
 
 #include <filesystem>
 #include <iostream>
@@ -10,21 +10,24 @@
 #include "../Build/x64/Debug/Output/TransferMatrix/CompiledShaders/DefaultVS.h"
 #include "../Build/x64/Debug/Output/TransferMatrix/CompiledShaders/TM2DielectricPS.h"
 #include "../Build/x64/Debug/Output/TransferMatrix/CompiledShaders/TM2OpaquePS.h"
+#include "TM6PS.h"
 
-
-TM2Resources::TM2Resources(const std::string & FGD_path, const std::string& FGD_4D_path, const std::string & TIR_path)
+TransferMatrixResources::TransferMatrixResources(const std::string & FGD_path, const std::string& FGD_4D_path, const std::string& GD_path, const std::string & TIR_path)
 {
 
 	//init PSO
-	Initialise(FGD_path, FGD_4D_path, TIR_path);
+	Initialise(FGD_path, FGD_4D_path, GD_path, TIR_path);
 
 }
 
-void TM2Resources::Initialise(const std::string& FGD_path, const std::string& FGD_4D_path, const std::string& TIR_path)
+void TransferMatrixResources::Initialise(const std::string& FGD_path, const std::string& FGD_4D_path, const std::string& GD_path, const std::string& TIR_path)
 {
 
 	auto tex = TextureManager::LoadDDSFromFile(FGD_path);
 	FGD_LUT = tex;
+
+	GD_LUT = LoadGDLUTFromFile(GD_path);
+
 
 	//init PSO
 	TM2PSO.SetRasterizerState(Graphics::RasterizerDefault);
@@ -34,6 +37,9 @@ void TM2Resources::Initialise(const std::string& FGD_path, const std::string& FG
 	TM2PSO.SetPrimitiveTopologyType(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 	TM2PSO.SetVertexShader(g_pDefaultVS, sizeof(g_pDefaultVS));
 	TM2PSO.SetPixelShader(g_pTM2OpaquePS, sizeof(g_pTM2OpaquePS));
+
+	TM6PSO = TM2PSO;
+	TM6PSO.SetPixelShader(g_pTM6PS, sizeof(g_pTM6PS));
 
 
 	TIR_LUT = LoadTIRLutFromFile(TIR_path);
@@ -48,7 +54,7 @@ void TM2Resources::Initialise(const std::string& FGD_path, const std::string& FG
 /// </summary>
 /// <param name="TIR_path"></param>
 /// <returns></returns>
-Texture3D TM2Resources::LoadTIRLutFromFile(const std::string& TIR_path)
+Texture3D TransferMatrixResources::LoadTIRLutFromFile(const std::string& TIR_path)
 {
 	struct range {
 		float min;
@@ -97,7 +103,7 @@ Texture3D TM2Resources::LoadTIRLutFromFile(const std::string& TIR_path)
 	return TIR;
 }
 
-Texture3D TM2Resources::LoadFGDLUTFromFile(const std::string& FGD_path)
+Texture3D TransferMatrixResources::LoadFGDLUTFromFile(const std::string& FGD_path)
 {
 	std::vector<float> data;
 	LoadLUTFromFile<4>(FGD_path, data);
@@ -153,6 +159,16 @@ Texture3D TM2Resources::LoadFGDLUTFromFile(const std::string& FGD_path)
 
 	ASSERT(std::none_of(new_data.cbegin(), new_data.cend(), [](float v) -> bool {return std::isnan(v); }));
 
+#ifdef DEBUG
+
+	const auto max = std::max_element(new_data.cbegin(), new_data.cend());
+	const auto min = std::min_element(new_data.cbegin(), new_data.cend());
+
+	std::cout << std::format("Max element is {}, Min element is {}", *max, *min) << std::endl;
+
+#endif
+
+
 	//4D texture
 	ASSERT(new_data.size() == Dim * Dim * Dim * (Dim/2));
 
@@ -163,4 +179,18 @@ Texture3D TM2Resources::LoadFGDLUTFromFile(const std::string& FGD_path)
 	FGD.Create3D(RowPitchbytes, Dim, Dim, Dim * (Dim/2), DXGI_FORMAT_R32_FLOAT, new_data.data());
 
 	return FGD;
+}
+
+Texture TransferMatrixResources::LoadGDLUTFromFile(const std::string& GD_path)
+{
+	constexpr size_t LUT_DIM = 64;
+	std::vector<float> data;
+	LoadLUTFromFile<2>(GD_path, data);
+
+	Texture tex{};
+
+	tex.Create2D(LUT_DIM * sizeof(float), LUT_DIM, LUT_DIM, DXGI_FORMAT_R32_FLOAT, data.data());
+	
+
+	return tex;
 }

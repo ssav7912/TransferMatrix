@@ -15,7 +15,7 @@ public:
 	void Initialise(struct ID3D12Device* device, DescriptorHeap SRVDescriptorHeap);
 	void Teardown();
 
-	void LayerUI(int32_t num_layers, int32_t max_layers, bool UseTM6 = false);
+	void LayerUI(int32_t num_layers, int32_t max_layers);
 
 	
 
@@ -38,7 +38,7 @@ public:
 
 	int32_t NumSamples = 5;
 	int32_t NumLayers = 2;
-
+	bool UseTM6 = false;
 
 };
 

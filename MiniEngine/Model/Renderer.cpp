@@ -24,7 +24,7 @@
 #include "../Core/BufferManager.h"
 #include "../Core/ShadowCamera.h"
 
-#include "../TransferMatrix/TM2Resources.h"
+#include "../TransferMatrix/TransferMatrixResources.h"
 
 #include "CompiledShaders/DefaultVS.h"
 #include "CompiledShaders/DefaultSkinVS.h"
@@ -45,6 +45,8 @@
 #include "CompiledShaders/CutoutDepthPS.h"
 #include "CompiledShaders/SkyboxVS.h"
 #include "CompiledShaders/SkyboxPS.h"
+
+#include "../TransferMatrix/CompiledShaders/TM6PS.h"
 
 #pragma warning(disable:4319) // '~': zero extending 'uint32_t' to 'uint64_t' of greater size
 
@@ -72,7 +74,7 @@ namespace Renderer
     RootSignature m_RootSig;
     GraphicsPSO m_SkyboxPSO(L"Renderer: Skybox PSO");
     GraphicsPSO m_DefaultPSO(L"Renderer: Default PSO"); // Not finalized.  Used as a template.
-    TM2Resources transfer_matrix;
+    TransferMatrixResources transfer_matrix;
 
     DescriptorHandle m_CommonTextures;
 }
@@ -80,7 +82,7 @@ namespace Renderer
 void Renderer::Initialize(void)
 {
     ///TM2 PSOs
-    transfer_matrix.Initialise("FGD.dds", "tm_FGD.bin", "tm_TIR.bin");
+    transfer_matrix.Initialise("FGD.dds", "tm_FGD.bin", "tm_GD.bin", "tm_TIR.bin");
 
 
     if (s_Initialized)
@@ -221,7 +223,9 @@ void Renderer::Initialize(void)
     //TM2 PSO
     transfer_matrix.TM2PSO.SetRootSignature(m_RootSig);
     transfer_matrix.TM2PSO.SetRenderTargetFormats(1, &ColorFormat, DepthFormat);
-
+   
+    transfer_matrix.TM6PSO.SetRootSignature(m_RootSig);
+    transfer_matrix.TM6PSO.SetRenderTargetFormats(1, &ColorFormat, DepthFormat);
 
     // Skybox PSO
 
@@ -242,10 +246,11 @@ void Renderer::Initialize(void)
     Lighting::InitializeResources();
 
     // Allocate a descriptor table for the common textures
-    m_CommonTextures = s_TextureHeap.Alloc(8 + 3);
+    constexpr size_t NumTransferMatrixResources = 4;
+    m_CommonTextures = s_TextureHeap.Alloc(8 + NumTransferMatrixResources);
 
-    uint32_t DestCount = 8 + 3;
-    uint32_t SourceCounts[] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+    uint32_t DestCount = 8 + NumTransferMatrixResources;
+    uint32_t SourceCounts[] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
     D3D12_CPU_DESCRIPTOR_HANDLE SourceTextures[] =
     {
@@ -260,6 +265,7 @@ void Renderer::Initialize(void)
         transfer_matrix.TIR_LUT.GetSRV(),
         transfer_matrix.FGD_LUT.GetSRV(),
         transfer_matrix.FGD_4D_LUT.GetSRV(),
+        transfer_matrix.GD_LUT.GetSRV(),
         
     };
 
@@ -344,9 +350,18 @@ uint8_t Renderer::GetPSO(uint16_t psoFlags)
     uint32_t UseTransferMatrix = 0;
     bool useTM2 = CommandLineArgs::GetInteger(L"TransferMatrix", UseTransferMatrix);
 
+    GraphicsPSO ColorPSO;
+    if (UseTransferMatrix != 0)
+    {
+        ColorPSO = transfer_matrix.TM2PSO;
+    }
+    else {
+        ColorPSO = m_DefaultPSO;
+    
+    }
 
 
-    GraphicsPSO ColorPSO = useTM2 ? transfer_matrix.TM2PSO : m_DefaultPSO;
+    
 
     uint16_t Requirements = kHasPosition | kHasNormal;
     ASSERT((psoFlags & Requirements) == Requirements);
@@ -456,10 +471,24 @@ uint8_t Renderer::GetPSO(uint16_t psoFlags)
 
     // If not found, keep the new one, and return its index
     sm_PSOs.push_back(ColorPSO);
+    
+    //copy the pipeline state back to the transfer matrix resources to use directly. 
+    if (useTM2)
+    {
+        transfer_matrix.TM2PSO = ColorPSO;
+        transfer_matrix.TM6PSO = ColorPSO;
+        transfer_matrix.TM6PSO.SetPixelShader(g_pTM6PS, sizeof(g_pTM6PS));
+        transfer_matrix.TM2PSO.Finalize();
+        transfer_matrix.TM6PSO.Finalize();
+    }
 
     // The returned PSO index has read-write depth.  The index+1 tests for equal depth.
     ColorPSO.SetDepthStencilState(DepthStateTestEqual);
+
+
+
     ColorPSO.Finalize();
+
 #ifdef DEBUG
     for (uint32_t i = 0; i < sm_PSOs.size(); ++i)
         ASSERT(ColorPSO.GetPipelineStateObject() != sm_PSOs[i].GetPipelineStateObject());
@@ -700,7 +729,21 @@ void MeshSorter::RenderMeshes(
                 ASSERT(object.skeleton != nullptr, "Unspecified joint matrix array");
                 context.SetDynamicSRV(kSkinMatrices, sizeof(Joint) * mesh.numJoints, object.skeleton + mesh.startJoint);
             }
-            context.SetPipelineState(sm_PSOs[key.psoIdx]);
+
+            if ((mesh.psoFlags & PSOFlags::kUseTM2) == PSOFlags::kUseTM2)
+            {
+                if (transfer_matrix.UseTM6)
+                {
+                    context.SetPipelineState(transfer_matrix.TM6PSO);
+                }
+                else {
+                    context.SetPipelineState(transfer_matrix.TM2PSO);
+                }
+            }
+            else
+            {
+                context.SetPipelineState(sm_PSOs[key.psoIdx]);
+            }
 
             if (m_CurrentPass == kZPass)
             {

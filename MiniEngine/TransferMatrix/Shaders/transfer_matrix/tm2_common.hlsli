@@ -18,11 +18,24 @@ struct layer_components_tm2
     
 };
 
+layer_components_tm2 zero_init_tm2_components()
+{
+    layer_components_tm2 x;
+    x.reflection_down = zero_hg();
+    x.transmission_down = zero_hg();
+    x.reflection_up = zero_hg();
+    x.transmission_up = zero_hg();
+    x.component_type = TM_TYPE_NOCOMPONENT;
+    return x;
+}
+
 
 tensor3d2x2 energy_matrix(layer_components_tm2 ops)
 {
+    //if the transmission energy is 0, should we make this the identity matrix?
     tensor3d2x2 e = { 0.0f.xxx, 0.0f.xxx, 0.0f.xxx, 0.0f.xxx };
-    const float3 t_inv = 1.0f / ops.transmission_down.norm;
+    //can i saturate this.. 
+    const float3 t_inv = safe_div(1.0f.xxx, ops.transmission_down.norm);
     
     e._11 = t_inv;
     e._12 = -ops.reflection_up.norm * t_inv;
@@ -41,7 +54,7 @@ float2x2 asymmetry_matrix(layer_components_tm2 ops)
     const float rp_asymmetry = ops.reflection_up.asymmetry * float3_average(ops.reflection_up.norm);
     const float tp_asymmetry = ops.transmission_up.asymmetry * float3_average(ops.transmission_up.norm);
     
-    const float t_inv = 1.0f / t_asymmetry;
+    const float t_inv = safe_div(1.0f, t_asymmetry);
     
     asymmetry._11 = t_inv;
     asymmetry._12 = -rp_asymmetry * t_inv;

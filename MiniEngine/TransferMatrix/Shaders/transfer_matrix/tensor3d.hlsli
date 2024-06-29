@@ -67,9 +67,36 @@ struct tensor3d6x6
  
 };
 
+tensor3d6x6 zero_tensor3d6x6()
+{
+    tensor3d6x6 x;
+    x.type = TM_TYPE_NOCOMPONENT;
+    x._11 = 0.0f.xxx;
+    x._21 = 0.0f.xxx;
+    x._31 = 0.0f.xxx;
+    x._41 = 0.0f.xxx;
+    x._51 = 0.0f.xxx;
+    x._61 = 0.0f.xxx;
+    x._12 = 0.0f.xxx;
+    x._22 = 0.0f.xxx;
+    x._32 = 0.0f.xxx;
+    x._33 = 0.0f.xxx;
+    x._34 = 0.0f.xxx;
+    x._35 = 0.0f.xxx;
+    x._36 = 0.0f.xxx;
+    x._42 = 0.0f.xxx;
+    x._43 = 0.0f.xxx;
+    x._44 = 0.0f.xxx;
+    x._45 = 0.0f.xxx;
+    x._46 = 0.0f.xxx;
+    x._52 = 0.0f.xxx;
+    x._62 = 0.0f.xxx;
+    return x;
+}
+
 tensor3d6x6 tensor3d6x6_identity()
 {
-    tensor3d6x6 x; 
+    tensor3d6x6 x = zero_tensor3d6x6();
     x.type = TM_TYPE_NOCOMPONENT;
     x._11 = 1.0f.xxx;
     x._22 = 1.0f.xxx;

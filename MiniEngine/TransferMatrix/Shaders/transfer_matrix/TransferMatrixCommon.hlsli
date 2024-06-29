@@ -40,6 +40,7 @@ Texture2D<float2> FGD_LUT : register(t19);
 #else
 Texture3D<float> FGD_LUT : register(t20);
 #endif
+Texture2D<float> GD_LUT : register(t21);
 
 
 //IBL
@@ -102,9 +103,23 @@ float hg_lh_norm(float g)
 }
 
 
+float safe_div(float n, float d)
+{
+    return abs(d) > EPSILON ? n / d : 0.f;
+}
+
+float3 safe_div(float3 n, float3 d)
+{
+    float3 r;
+    r.x = abs(d.x) > EPSILON ? n.x / d.x : 0.f;
+    r.y = abs(d.y) > EPSILON ? n.y / d.y : 0.f;
+    r.z = abs(d.z) > EPSILON ? n.z / d.z : 0.f;
+    return r;
+}
+
 bool isZero(float3 vec)
 {
-    return vec.x + vec.y + vec.z == 0;
+    return vec.x + vec.y + vec.z == 0.0f;
 }
 
 float float3_max(float3 v)
@@ -115,6 +130,7 @@ float float3_max(float3 v)
 
 float float3_average(float3 f)
 {
+    
     return (f.x + f.y + f.z) / 3.0f;
 
 }
@@ -590,6 +606,10 @@ float3 sample_FGD(float cti, float alpha, float3 ior, float3 kappa)
     return output;
 }
 
+float sample_GD(float cti, float rough)
+{
+    return GD_LUT.Sample(LUTSampler, float2(cti, rough));
+}
 
 void albedos(float cti, float alpha, float ior_ij, out float3 r_ij, out float3 t_ij, out float3 r_ji, out float3 t_ji)
 {
@@ -603,11 +623,13 @@ void albedos(float cti, float alpha, float ior_ij, out float3 r_ij, out float3 t
         return;
     }
     
+
     r_ij = sample_FGD(cti, alpha, ior_ij.xxx, 0.0f.xxx);
     
     
     r_ji = r_ij;
     
+    //somehow this is 0. FGD LUT does have 1.0 values... Possible to hit them??
     t_ij = 1.0f.xxx - r_ij; //can't be negative
     t_ji = t_ij;
     

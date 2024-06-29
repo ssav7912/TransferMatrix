@@ -19,6 +19,7 @@
 #include "../Core/CommandContext.h"
 #include "../Core/UploadBuffer.h"
 #include "../Core/TextureManager.h"
+#include "../TransferMatrix/TransferMatrixResources.h"
 #include <cstdint>
 #include <vector>
 
@@ -44,6 +45,7 @@ namespace Renderer
     extern DescriptorHeap s_TextureHeap;
     extern DescriptorHeap s_SamplerHeap;
     extern DescriptorHandle m_CommonTextures;
+    extern TransferMatrixResources transfer_matrix;
 
     enum RootBindings
     {

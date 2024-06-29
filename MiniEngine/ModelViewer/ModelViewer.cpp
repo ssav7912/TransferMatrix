@@ -37,7 +37,7 @@
 #include "../ImGUI/backends/imgui_impl_win32.h"
 #include "../ImGUI/imgui.h"
 #include "GUI.h"
-#include "../TransferMatrix/TM2Resources.h"
+#include "../TransferMatrix/TransferMatrixResources.h"
 
 
 #define LEGACY_RENDERER
@@ -74,6 +74,7 @@ private:
 
     GUI gui = {};
     bool CursorVisible = false; 
+
 };
 
 CREATE_APPLICATION( ModelViewer )
@@ -193,6 +194,8 @@ void ModelViewer::Startup( void )
         
         if (CommandLineArgs::GetInteger(L"TransferMatrix", UseTransferMatrix) == true)
         {
+            
+    
             Mesh& mesh = *(Mesh*)Model->m_MeshData.get(); //wtf
             mesh.psoFlags |= PSOFlags::kUseTM2;
         }
@@ -214,6 +217,7 @@ void ModelViewer::Startup( void )
     DescriptorHeap FontHeap {};
     FontHeap.Create(L"Font Descriptor Heap", D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 16);
     gui.Initialise(g_Device, FontHeap);
+    
 
 }
 
@@ -266,7 +270,7 @@ void ModelViewer::Update( float deltaT )
 
 
     io.AddMouseButtonEvent(0, GameInput::IsPressed(GameInput::kMouse0));
-    
+    Renderer::transfer_matrix.UseTM6 = gui.UseTM6;
     
 
     GraphicsContext& gfxContext = GraphicsContext::Begin(L"Scene Update");
@@ -465,7 +469,7 @@ void ModelViewer::RenderScene( void )
         MotionBlur::RenderObjectBlur(gfxContext, g_VelocityBuffer);
 
 
-    gui.LayerUI(std::max(0,std::min(TM2Resources::MAX_LAYERS-1, gui.NumLayers)), TM2Resources::MAX_LAYERS - 1); //-1 to account for the external media.
+    gui.LayerUI(std::max(0,std::min(TransferMatrixResources::MAX_LAYERS-1, gui.NumLayers)), TransferMatrixResources::MAX_LAYERS - 1); //-1 to account for the external media.
 
 
     ImGui::Render();

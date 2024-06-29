@@ -12,6 +12,15 @@ struct henyey_greenstein
     float3 norm;
 };
 
+henyey_greenstein zero_hg()
+{
+    henyey_greenstein h;
+    h.asymmetry = 0.0f;
+    h.mean = 0.0f.xxx;
+    h.norm = 0.0f.xxx;
+    return h;
+}
+
 ///Henyey-Greenstein phase function.
 ///Equation 13.
 ///@param theta deviation angle (radians) from

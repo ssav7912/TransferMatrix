@@ -1,37 +1,37 @@
 #pragma once
 #include "tensor3d.hlsli"
-
+#include "TransferMatrixCommon.hlsli"
 
 //computes downward reflection energy for transfer matrix of interface separating 2 media.
 float reflection_energy_tm2(float2x2 m_ij)
 {
-    return m_ij._21 / m_ij._11;
+    return safe_div(m_ij._21, m_ij._11);
 }
 
 float3 reflection_energy_tm2(tensor3d2x2 m_ij)
 {
-    return m_ij._21 / m_ij._11;
+    return safe_div(m_ij._21, m_ij._11);
 }
 
 float reflection_energy_tm2(float2x2 m_ij, float cond)
 {
-    return (m_ij._21 + m_ij._22 * cond) / (m_ij._11 + m_ij._12 * cond);
+    return safe_div((m_ij._21 + m_ij._22 * cond), (m_ij._11 + m_ij._12 * cond));
 }
 
 float3 reflection_energy_tm2(tensor3d2x2 m, float3 cond)
 {
-    return (m._21 + m._22 * cond) / (m._11 + m._12 * cond);
+    return safe_div((m._21 + m._22 * cond), (m._11 + m._12 * cond));
 }
 
 //computes downward transmission energy for transfer matrix of interface separating 2 media.
 float transmission_energy_tm2(float2x2 m_ij)
 {
-    return 1.0f / m_ij._11;
+    return safe_div(1.0f, m_ij._11);
 }
 
 float3 transmission_energy_tm2(tensor3d2x2 m_ij)
 {
-    return 1.0f.xxx / m_ij._11;
+    return safe_div(1.0f.xxx, m_ij._11);
 }
 
 ///computes dielectric reflected energy for 2 energy matrices.
@@ -60,3 +60,4 @@ float3 explicit_reflectance_tm2(tensor3d2x2 top_transfer, float base_reflectance
 {
     return (top_transfer._21 + top_transfer._22 * base_reflectance_transfer) / (top_transfer._11 + top_transfer._12 * base_reflectance_transfer);
 }
+

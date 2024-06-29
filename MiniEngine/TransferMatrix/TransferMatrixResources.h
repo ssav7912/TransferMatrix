@@ -9,34 +9,34 @@
 #include <filesystem>
 #include <fstream>
 
-class TM2Resources
+class TransferMatrixResources
 {
 public:
-	TM2Resources() = default;
-	TM2Resources(const std::string & FGD_path, const std::string& FGD_4D_path, const std::string & TIR_path);
+	TransferMatrixResources() = default;
+	TransferMatrixResources(const std::string & FGD_path, const std::string& FGD_4D_path, const std::string& GD_path, const std::string & TIR_path);
 
-	void Initialise(const std::string& FGD_path, const std::string& FGD_4D_path, const std::string& TIR_path);
+	void Initialise(const std::string& FGD_path, const std::string& FGD_4D_path, const std::string& GD_path, const std::string& TIR_path);
 
+	bool UseTM6 = false;
 
 	GraphicsPSO TM2PSO{ L"2-flux Transfer Matrix PSO" };
+	GraphicsPSO TM6PSO{ L"6-flux Transfer Matrix PSO" };
 
 	Texture3D TIR_LUT;
 	TextureRef FGD_LUT;
+	Texture GD_LUT;
 	Texture3D FGD_4D_LUT;
+
 
 	static constexpr int32_t NUM_LAYERS = 2;
 	static constexpr int32_t MAX_LAYERS = 5;
 	
-	//const void* TM2_PS = g_pTM2DielectricPS;
-	//const void* TM2_VS = g_pDefaultVS;
-
-	//static constexpr size_t sizeof_TM2PS = sizeof(g_pTM2DielectricPS);
-	//static constexpr size_t sizeof_TM2VS = sizeof(g_pDefaultVS);
 
 private:
 
 	Texture3D LoadTIRLutFromFile(const std::string& TIR_path);
 	Texture3D LoadFGDLUTFromFile(const std::string& FGD_path);
+	Texture LoadGDLUTFromFile(const std::string& GD_path);
 
 	template<size_t LutDimension>
 	void LoadLUTFromFile(const std::string& path, std::vector<float>& data)
@@ -92,18 +92,18 @@ __declspec(align(16)) struct float_with_pad
 //Constant buffer for layer parameters
 struct LayerConstants
 {
-	__declspec(align(16)) float3_padded IORs[TM2Resources::MAX_LAYERS];
-	__declspec(align(16)) float3_padded Kappas[TM2Resources::MAX_LAYERS];
+	__declspec(align(16)) float3_padded IORs[TransferMatrixResources::MAX_LAYERS];
+	__declspec(align(16)) float3_padded Kappas[TransferMatrixResources::MAX_LAYERS];
 
-	__declspec(align(16)) float3_padded Sigma_S[TM2Resources::MAX_LAYERS];
+	__declspec(align(16)) float3_padded Sigma_S[TransferMatrixResources::MAX_LAYERS];
 
-	__declspec(align(16)) float3_padded Sigma_K[TM2Resources::MAX_LAYERS];
+	__declspec(align(16)) float3_padded Sigma_K[TransferMatrixResources::MAX_LAYERS];
 
-	__declspec(align(16)) float_with_pad Depths[TM2Resources::MAX_LAYERS];
+	__declspec(align(16)) float_with_pad Depths[TransferMatrixResources::MAX_LAYERS];
 
-	__declspec(align(16)) float_with_pad G[TM2Resources::MAX_LAYERS];
+	__declspec(align(16)) float_with_pad G[TransferMatrixResources::MAX_LAYERS];
 
-	__declspec(align(16)) float_with_pad Roughs[TM2Resources::MAX_LAYERS];
+	__declspec(align(16)) float_with_pad Roughs[TransferMatrixResources::MAX_LAYERS];
 	//uint8_t _pad3[16 * 3];
 	int32_t layers;
 	int32_t num_samples;

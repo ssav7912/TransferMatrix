@@ -47,10 +47,31 @@ struct layer_components_tm6
     } media_type;
 };
 
+layer_components_tm6 ops_zero_init()
+{
+    layer_components_tm6 s;
+    s.interface_type.reflection_down = zero_hg();
+    s.interface_type.reflection_down_secondary = zero_hg();
+    s.interface_type.reflection_up = zero_hg();
+    s.interface_type.reflection_up_secondary = zero_hg();
+    s.interface_type.transmission_down = zero_hg();
+    s.interface_type.transmission_down_secondary = zero_hg();
+    s.interface_type.transmission_up = zero_hg();
+    s.interface_type.transmission_up_secondary = zero_hg();
+    
+    s.media_type.primary_flux_transmission = zero_hg();
+    s.media_type.secondary_flux_backward_reflection = zero_hg();
+    s.media_type.secondary_flux_forward_transmission = zero_hg();
+    s.type = TM_TYPE_NOCOMPONENT;
+    
+    return s;
+
+}
+
 
 tensor3d6x6 energy_matrix(layer_components_tm6 ops)
 {
-    tensor3d6x6 energy;
+    tensor3d6x6 energy = tensor3d6x6_identity();
     energy.type = ops.type;
     
     if (ops.type == TM_TYPE_DIELECTRICINTERFACE)
@@ -194,7 +215,8 @@ void dielectric_transfer_factors(float3 incident, float ior_ij, float rough, out
     float ior_ji = 0.0f;
     float s_t_ij = 0.0f;
     float s_t_ji = 0.0f;
-   
+    ops = ops_zero_init();
+    
     if (abs(ior_ij - 1.0f) < 1e-5f)
     {
         ops.type = TM_TYPE_NOCOMPONENT;
@@ -230,6 +252,7 @@ void dielectric_transfer_factors(float3 incident, float ior_ij, float rough, out
 
 void conductor_transfer_factors(float3 incident, float3 ior, float3 kappa, float rough, out layer_components_tm6 ops)
 {
+    ops = ops_zero_init();
     ops.type = TM_TYPE_CONDUCTORINTERFACE;
     ops.interface_type.reflection_down.asymmetry = ggx_to_hg(rough);
     ops.interface_type.reflection_down.mean = reflectZ(incident);
@@ -239,13 +262,15 @@ void conductor_transfer_factors(float3 incident, float3 ior, float3 kappa, float
     ops.interface_type.reflection_down_secondary = ops.interface_type.reflection_down;
 }
 
-void medium_transfer_factors(float3 incident, float depth, float3 sigma_s, float3 sigma_k, float g, layer_components_tm6 ops)
+void medium_transfer_factors(float3 incident, float depth, float3 sigma_s, float3 sigma_k, float g, out layer_components_tm6 ops)
 {
+    ops = ops_zero_init();
     ops.type = TM_TYPE_HOMOGENOUSMEDIUM;
     if (depth == 0.0f)
     {
         ops.type = TM_TYPE_NOCOMPONENT;
         ops.interface_type.transmission_down.mean = -incident;
+        return;
     }
     
     float tau = depth / incident.z;
@@ -253,6 +278,8 @@ void medium_transfer_factors(float3 incident, float depth, float3 sigma_s, float
     const float3 sigma_sb = sigma_s * hg_lh_norm(g);
     const float3 sigma_sf = sigma_s - sigma_sb;
     const float3 sigma_ext = sigma_s + sigma_k;
+    
+    //Energy
     {
         const float3 alpha = sigma_ext - sigma_sf;
         const float3 beta = sigma_sb;
@@ -273,6 +300,7 @@ void medium_transfer_factors(float3 incident, float depth, float3 sigma_s, float
 
     }
     
+    //Asymmetry
     {
         const float3 alpha = sigma_ext - sigma_sf * g;
         const float3 beta = sigma_sb * -g;
@@ -284,10 +312,10 @@ void medium_transfer_factors(float3 incident, float depth, float3 sigma_s, float
         const float3 x0 = 1.0f.xxx / (C * gamma + S * alpha);
         
         ops.media_type.primary_flux_transmission.asymmetry = 1.0f;
-        //TODO safe_div
-        ops.media_type.secondary_flux_backward_reflection.asymmetry = float3_average((S * beta * x0) / (ops.media_type.secondary_flux_backward_reflection.norm));
 
-        ops.media_type.secondary_flux_forward_transmission.asymmetry = float3_average((gamma * x0) / (ops.media_type.secondary_flux_forward_transmission.norm));
+        ops.media_type.secondary_flux_backward_reflection.asymmetry = float3_average(safe_div((S * beta * x0), (ops.media_type.secondary_flux_backward_reflection.norm)));
+
+        ops.media_type.secondary_flux_forward_transmission.asymmetry = float3_average(safe_div((gamma * x0), (ops.media_type.secondary_flux_forward_transmission.norm)));
         
     }
 }
@@ -298,6 +326,7 @@ void components_transfer_factors_tm6(float3 incident, LayerProperties props, out
     
     for (int i = 0; i < NumLayers; i++)
     {
+        ops[i] = ops_zero_init();
         ior_ij = props.iors[i + 1] / props.iors[i];
         
         if (isZero(props.kappas[i + 1]))
@@ -359,9 +388,9 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
     float asymmetry_s_T_0j_RT = 1.0f; 
     
     
-    float3 TIR_norm;
+    float3 TIR_norm = 0.0f.xxx;
     
-    uint req = TM_TYPE_NOCOMPONENT; //what is this?
+    uint req = 0u; //what is this?
     
     tensor3d6x6 energy_matrix_0i = tensor3d6x6_identity();
     tensor3d6x6 asymmetry_matrix_0i = tensor3d6x6_identity();
@@ -381,7 +410,7 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
         }
         else if (ops[c].type == TM_TYPE_DIELECTRICINTERFACE)
         {
-            const int i = count >> 1; //hmmm
+            const int i = c / 2.0f; //hmmm
             ior_ij = float3_average((props.iors[i + 1] / props.iors[i]));
             ior_ji = 1.0f / ior_ij;
             
@@ -448,7 +477,7 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
             energy_matrix_0i = mul(energy_matrix_0i, energy_matrix(ops[c]));
             asymmetry_matrix_0i = mul(asymmetry_matrix_0i, asymmetry_matrix(ops[c]));
             
-            //TODO
+           
             matrix_factors(energy_matrix_0i, energy_reflect_0i, energy_reflect_f_0i, energy_reflect_b_0i, req);
             
             matrix_factors(asymmetry_matrix_0i, asymmetry_reflect_0i, asymmetry_reflect_f_0i, asymmetry_reflect_b_0i, req);
@@ -460,7 +489,6 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
             req |= TM_TRANSFER_FACTOR_PRIMARY_REFLECTANCE;
             req |= req & TM_TRANSFER_FACTOR_PRIMARY_REFLECTANCE ? TM_TRANSFER_FACTOR_SECONDARY_FORWARD_REFLECTANCE : TM_TRANSFER_FACTOR_NONE;
             
-            //TODO
             matrix_factors(energy_matrix_0i, energy_reflect_0i, energy_reflect_f_0i, energy_reflect_b_0i, ops[c].interface_type.reflection_down.norm, req);
             matrix_factors(asymmetry_matrix_0i, asymmetry_reflect_0i, asymmetry_reflect_f_0i, asymmetry_reflect_b_0i, ops[c].interface_type.reflection_down.norm * ops[c].interface_type.reflection_down.asymmetry, req);
         }
@@ -470,8 +498,8 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
             energy_reflect_i = energy_reflect_0i - energy_reflect_0h;
             
             lobes[count].norm = max(energy_reflect_i, 0.0f.xxx);
-            //TODO: save division
-            lobes[count].asymmetry = float3_average((asymmetry_reflect_0i - asymmetry_reflect_0h) / energy_reflect_i);
+
+            lobes[count].asymmetry = float3_average(safe_div((asymmetry_reflect_0i - asymmetry_reflect_0h), energy_reflect_i));
 
             lobe_incident[count++] = incident;
         }
@@ -481,7 +509,7 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
             energy_reflect_i = energy_reflect_f_0i - energy_reflect_f_0h;
             
             lobes[count].norm = max(energy_reflect_i, 0.0f);
-            lobes[count].asymmetry = float3_average((asymmetry_reflect_f_0i - asymmetry_reflect_f_0h )/ energy_reflect_i);
+            lobes[count].asymmetry = float3_average(safe_div((asymmetry_reflect_f_0i - asymmetry_reflect_f_0h), energy_reflect_i));
             lobe_incident[count++] = incident;
         }
         
@@ -490,7 +518,7 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
             energy_reflect_i = energy_reflect_b_0i - energy_reflect_b_0h;
             
             lobes[count].norm = max(energy_reflect_i, 0.0f.xxx);
-            lobes[count].asymmetry = float3_average((asymmetry_reflect_b_0i - asymmetry_reflect_b_0h) / energy_reflect_i);
+            lobes[count].asymmetry = float3_average(safe_div((asymmetry_reflect_b_0i - asymmetry_reflect_b_0h), energy_reflect_i));
             lobe_incident[count++] = incident_reflect;
 
         }
@@ -523,6 +551,11 @@ float3 eval(sample_record rec, uint measure, LayerProperties props)
     
     henyey_greenstein lobes[TM6_LOBE_MAX];
     float3 lobes_incident[TM6_LOBE_MAX];
+    for (int k = 0; k < TM6_LOBE_MAX; k++)
+    {
+        lobes_incident[k] = 0.0f.xxx;
+        lobes[k] = zero_hg();
+    }
     
     const int lobe_count = outgoing_lobes(rec.incident, props, lobes, lobes_incident);
     
@@ -562,8 +595,7 @@ float3 eval(sample_record rec, uint measure, LayerProperties props)
         const float G2 = smithG(incident, rec.outgoing, H, rough);
         const float D = D_GGX(H, rough);
         
-        //TODO albedo normalisation.
-        const float essi = 1.0f;
+        const float essi = sample_GD(incident.z, rough);
         
         const float f = G2 * D / (4.0f * incident.z * essi);
         
@@ -573,6 +605,131 @@ float3 eval(sample_record rec, uint measure, LayerProperties props)
 
     return throughput;
 }
+
+float3 eval_lobe(float3 incident, float3 outgoing, henyey_greenstein lobe)
+{
+    float3 H = normalize(incident + outgoing);
+    const float rough = hg_to_ggx(lobe.asymmetry);
+    const float G2 = smithG(incident, outgoing, H, rough);
+    const float D = D_GGX(H, rough);
+    
+    const float essi = sample_GD(incident.z, rough);
+    
+    const float f = G2 * D / (4.0f * incident.z * essi);
+    
+    
+    return lobe.norm * f;
+}
+
+float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProperties props)
+{
+    
+    henyey_greenstein lobes[TM6_LOBE_MAX];
+    float3 lobe_incident[TM6_LOBE_MAX];
+    for (int k = 0; k < TM6_LOBE_MAX; k++)
+    {
+        lobe_incident[k] = 0.0f.xxx;
+        lobes[k] = zero_hg();
+    }
+    
+    
+    const int lobe_count = outgoing_lobes(rec.incident, props, lobes, lobe_incident);
+    
+    float3 throughput = 0.0f.xxx;
+    float weight_sum = 0.0f;
+    for (int l = 0; l < lobe_count; l++)
+    {
+        weight_sum += float3_average(lobes[l].norm);
+    }
+    
+            
+    
+    
+    
+    const float3 H = float3(0.f, 0.f, 1.0f);
+    for (int i = 0; i < lobe_count; i++)
+    {
+        if (!isZero(lobes[i].norm))
+        {
+            
+
+            float3 lobe_throughput = 0.0f;
+            float lobe_pdf = 0.0f;
+            float lobe_weight = float3_average(lobes[i].norm);
+            const float rough = hg_to_ggx(lobes[i].asymmetry);
+        
+            rec.outgoing = reflectSpherical(lobe_incident[i], H);
+            rec.ior = 1.0f;
+            rec.is_reflection_sample = 0;
+            rec.sample_type = TM_SAMPLE_TYPE_GLOSSY_REFLECTION;
+        
+            if (rec.outgoing.z <= 0.0f)
+            {
+                //no contribution
+                continue;
+            }
+        
+            //pdf
+
+            float3 incoming = lobe_incident[i];
+            float3 outgoing = rec.outgoing;
+            incoming.z = abs(incoming.z);
+            outgoing.z = abs(outgoing.z);
+            
+            const float3 H = normalize(incoming + outgoing);
+            const float G1 = smithG1(incoming, H, rough);
+            const float D = D_GGX(H, rough);
+            
+            lobe_pdf = (lobe_weight * G1 * D / (4.0f * incoming.z)) / weight_sum;
+
+        
+            if (i == 0)
+            {
+                const float3 H = float3(0.f, 0.f, 1.f); //mirror reflection about normal, 
+                    //as using preintegrated lighting.
+                rec.outgoing = reflectSpherical(rec.incident, H);
+        
+                float G2 = smithG(rec.incident, rec.outgoing, H, props.rough[1]);
+                float D = D_GGX(H, props.rough[1]);
+            
+                const float3 iors_01 = props.iors[1] / props.iors[0];
+                float3 F;
+            
+                if (isZero(props.kappas[1]))
+                {
+                    F = fresnelDielectric(dot(rec.incident, H), float3_average(iors_01));
+                }
+                else
+                {
+                    F = fresnelConductorExact(dot(rec.incident, H), iors_01, props.kappas[1] / props.iors[0]);
+                }
+            
+                const float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(rec.outgoing));
+                const float BottomRough = props.rough[1];
+                const float BottomLOD = BottomRough * IBLRange + IBLBias;
+                const float3 TopIBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, outgoingWS, BottomLOD);
+                throughput += ((F * G2 * D / (4.0f * rec.incident.z)) / lobe_pdf) * TopIBLSample;
+            }
+        
+            if (i >= 1)
+            {
+                lobe_throughput += eval_lobe(lobe_incident[i], rec.outgoing, lobes[i]);
+                const float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(rec.outgoing));
+
+                const float LOD = rough * IBLRange + IBLBias;
+                const float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, outgoingWS, LOD);
+            
+                throughput += (lobe_throughput / lobe_pdf) * IBLSample;
+            
+            }
+
+        }
+    
+    }
+    return throughput;
+    
+}
+
 
 
 float3 sample(sample_record rec, out float pdf, out float out_rough, float2 samplePoint, float Hammersley, LayerProperties props)
@@ -665,46 +822,48 @@ float4 main(VSOutput vsOutput) : SV_Target0
         TM_SAMPLE_TYPE_GLOSSY_REFLECTION
     };
     
-    float3 accumulated_energy = 0.0f.xxx;
-    float accumulated_rough = 0.0f;
-    float3 accumulated_sample_direction = 0.0f.xxx;
     
-   // for (int i = 0; i < NumSamples; i++)
-   {
-        float2 samplePoint = 0.f.xx; //Hammersley(i, NumSamples);
-        float pdf;
+    float gs[LAYERS_MAX] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+    float depths_debug[LAYERS_MAX] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
+    float rough_debug[LAYERS_MAX] = { 0.0f, 0.01f, 0.1f, 0.0f, 0.0f};
+    
+    float3 Kappa_debug[LAYERS_MAX] = { 0.0f.xxx, float3(1.0f, 0.1f, 0.1f), 0.0f.xxx, 0.0f.xxx, 0.0f.xxx };
+    float3 IOR_debug[LAYERS_MAX] = { 1.003f.xxx, 1.0f.xxx, 1.5f.xxx, 0.0f.xxx, 0.0f.xxx };
+    float3 sigma_debug[LAYERS_MAX] = { 1.0f.xxx, 0.0f.xxx, 0.0f.xxx, 0.0f.xxx, 0.0f.xxx };
+    
+    LayerProperties props;
+    props.iors = IORs;
+    props.kappas = Kappas;
+    props.depths = Depths;
+    props.gs = G;
+    props.rough = Roughs;
+    props.sigma_k = Sigma_K;
+    props.sigma_s = Sigma_S;
         
-        LayerProperties props;
-        props.iors = IORs;
-        props.kappas = Kappas;
-        props.depths = Depths;
-        props.gs = G;
-        props.rough = Roughs;
-        props.sigma_k = Sigma_K;
-        props.sigma_s = Sigma_S;
         
-        
-        
-        //float3 sampleEnergy = sample(rec, pdf, accumulated_rough, samplePoint, Hammersley(0, 5).y, props);
-        float3 sampleEnergy = 0.0f;
-        float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(rec.outgoing));
-        
-        accumulated_energy += sampleEnergy;
-        accumulated_sample_direction = outgoingWS;
-        
-       
+            
+   float3 output = sample_preintegrated(rec, TangentToWorld, props);
+    
+    henyey_greenstein lobes[TM6_LOBE_MAX];
+    float3 lobe_incident[TM6_LOBE_MAX];
+    for (int k = 0; k < TM6_LOBE_MAX; k++)
+    {
+        lobes[k] = zero_hg();
+        lobe_incident[k] = 0.0f.xxx;
+    }
+    const int num_lobes = outgoing_lobes(rec.incident, props, lobes, lobe_incident);
+    
+    //float3 output = 0.0f;
+    for (int l = 0; l < num_lobes; l++)
+    {
+        output += isinf(lobes[l].norm).xxx;
     }
     
-    float rough = accumulated_rough;
-    float3 energy = accumulated_energy;
-    float3 direction = accumulated_sample_direction;
-    
-    float lod = rough * IBLRange + IBLBias;
-    float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, direction, lod);
+    //layer_components_tm6 ops[TM6_LOBE_MAX];
+    //components_transfer_factors_tm6(rec.incident, props, ops);
     
     
-    float3 output = accumulated_energy * IBLSample;
-    
+   
 	
     return float4(output, 1.0f);
 }

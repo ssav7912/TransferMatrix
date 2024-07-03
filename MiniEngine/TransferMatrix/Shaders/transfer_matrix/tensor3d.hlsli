@@ -1,5 +1,6 @@
 #pragma once
 #include "Constants.hlsli"
+#include "../Common.hlsli"
 
 struct tensor3d2x2
 {
@@ -8,10 +9,10 @@ struct tensor3d2x2
      [ _11 _12 ]
      [ _21 _22 ]*/
     
-    float3 _11;
-    float3 _12;
-    float3 _21;
-    float3 _22;
+    real3 _11;
+    real3 _12;
+    real3 _21;
+    real3 _22;
     
 };
 
@@ -39,30 +40,30 @@ struct tensor3d6x6
     
     
     //row 1
-    float3 _11;
-    float3 _21;
-    float3 _31;
-    float3 _41;
-    float3 _51;
-    float3 _61;
+    real3 _11;
+    real3 _21;
+    real3 _31;
+    real3 _41;
+    real3 _51;
+    real3 _61;
     
     //row 2
-    float3 _12;
-    float3 _22;
-    float3 _32;
-    float3 _33;
-    float3 _34;
-    float3 _35;
-    float3 _36;
+    real3 _12;
+    real3 _22;
+    real3 _32;
+    real3 _33;
+    real3 _34;
+    real3 _35;
+    real3 _36;
 
-    float3 _42;
-    float3 _43;
-    float3 _44;
-    float3 _45;
-    float3 _46;
+    real3 _42;
+    real3 _43;
+    real3 _44;
+    real3 _45;
+    real3 _46;
     
-    float3 _52;
-    float3 _62;
+    real3 _52;
+    real3 _62;
     
  
 };

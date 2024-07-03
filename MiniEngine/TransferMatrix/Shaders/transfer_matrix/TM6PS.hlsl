@@ -2,7 +2,7 @@
 #include "tensor3d.hlsli"
 
 #define TM6_LOBE_MAX (LAYERS_MAX * 3)
-#define TM_EXP_ARG_MAX 45.0f
+#define TM_EXP_ARG_MAX 45.0
 
 static const uint TM_TRANSFER_FACTOR_NONE = 0;
 static const uint TM_TRANSFER_FACTOR_PRIMARY_REFLECTANCE = 0x01;
@@ -112,15 +112,15 @@ tensor3d6x6 asymmetry_matrix(layer_components_tm6 ops)
     
     if (ops.type == TM_TYPE_DIELECTRICINTERFACE)
     {
-        const float3 reflection_down_asymmetry = ops.interface_type.reflection_down.norm * ops.interface_type.reflection_down.asymmetry;
-        const float3 transmission_down_asymmetry = ops.interface_type.transmission_down.norm * ops.interface_type.transmission_down.asymmetry;
-        const float3 reflection_up_asymmetry = ops.interface_type.reflection_up.norm * ops.interface_type.reflection_up.asymmetry;
-        const float3 transmission_up_asymmetry = ops.interface_type.transmission_up.norm * ops.interface_type.transmission_up.asymmetry;
+        const real3 reflection_down_asymmetry = ops.interface_type.reflection_down.norm * ops.interface_type.reflection_down.asymmetry;
+        const real3 transmission_down_asymmetry = ops.interface_type.transmission_down.norm * ops.interface_type.transmission_down.asymmetry;
+        const real3 reflection_up_asymmetry = ops.interface_type.reflection_up.norm * ops.interface_type.reflection_up.asymmetry;
+        const real3 transmission_up_asymmetry = ops.interface_type.transmission_up.norm * ops.interface_type.transmission_up.asymmetry;
         
-        const float3 reflection_down_secondary_asymmetry = ops.interface_type.reflection_down_secondary.norm * ops.interface_type.reflection_down_secondary.asymmetry;
-        const float3 transmission_down_secondary_asymmetry = ops.interface_type.transmission_down_secondary.norm * ops.interface_type.transmission_down_secondary.asymmetry;
-        const float3 reflection_up_secondary_asymmetry = ops.interface_type.reflection_up_secondary.norm * ops.interface_type.reflection_up_secondary.asymmetry;
-        const float3 transmission_up_secondary_asymmetry = ops.interface_type.transmission_up_secondary.norm * ops.interface_type.transmission_up_secondary.asymmetry;
+        const real3 reflection_down_secondary_asymmetry = ops.interface_type.reflection_down_secondary.norm * ops.interface_type.reflection_down_secondary.asymmetry;
+        const real3 transmission_down_secondary_asymmetry = ops.interface_type.transmission_down_secondary.norm * ops.interface_type.transmission_down_secondary.asymmetry;
+        const real3 reflection_up_secondary_asymmetry = ops.interface_type.reflection_up_secondary.norm * ops.interface_type.reflection_up_secondary.asymmetry;
+        const real3 transmission_up_secondary_asymmetry = ops.interface_type.transmission_up_secondary.norm * ops.interface_type.transmission_up_secondary.asymmetry;
         
         asymmetry._11 = 1.0f.xxx / transmission_down_asymmetry;
         asymmetry._12 = -reflection_up_asymmetry * asymmetry._11;
@@ -135,9 +135,9 @@ tensor3d6x6 asymmetry_matrix(layer_components_tm6 ops)
     }
     else if (ops.type == TM_TYPE_HOMOGENOUSMEDIUM)
     {
-        const float3 transmission_asymmetry = ops.media_type.primary_flux_transmission.norm * ops.media_type.primary_flux_transmission.asymmetry;
-        const float3 backwards_reflection_asymmetry = ops.media_type.secondary_flux_backward_reflection.norm * ops.media_type.secondary_flux_backward_reflection.asymmetry;
-        const float3 transmission_secondary_asymmetry = ops.media_type.secondary_flux_forward_transmission.norm * ops.media_type.secondary_flux_forward_transmission.asymmetry;
+        const real3 transmission_asymmetry = ops.media_type.primary_flux_transmission.norm * ops.media_type.primary_flux_transmission.asymmetry;
+        const real3 backwards_reflection_asymmetry = ops.media_type.secondary_flux_backward_reflection.norm * ops.media_type.secondary_flux_backward_reflection.asymmetry;
+        const real3 transmission_secondary_asymmetry = ops.media_type.secondary_flux_forward_transmission.norm * ops.media_type.secondary_flux_forward_transmission.asymmetry;
         
         asymmetry._11 = 1.0f.xxx / transmission_asymmetry;
         asymmetry._22 = transmission_asymmetry;
@@ -157,16 +157,16 @@ tensor3d6x6 asymmetry_matrix(layer_components_tm6 ops)
     return asymmetry;
 }
 
-void matrix_factors(tensor3d6x6 mat, inout float3 r, inout float3 r_f, inout float3 r_b, uint req)
+void matrix_factors(tensor3d6x6 mat, inout real3 r, inout real3 r_f, inout real3 r_b, uint req)
 {
-    const float3 x0 = 1.0f.xxx / mat._11;
+    const real3 x0 = 1.0.xxx / mat._11;
     if (req & TM_TRANSFER_FACTOR_SECONDARY_BACKWARD_REFLECTANCE)
     {
-        const float3 x1 = -mat._31 * mat._33 + mat._35 * mat._51;
-        const float3 x2 = mat._31 * mat._35 - mat._33 * mat._51;
-        const float3 x3 = x0 / (mat._33 * mat._33 - mat._35 * mat._35);
-        const float3 x4 = mat._43 * x3;
-        const float3 x5 = mat._45 * x3;
+        const real3 x1 = -mat._31 * mat._33 + mat._35 * mat._51;
+        const real3 x2 = mat._31 * mat._35 - mat._33 * mat._51;
+        const real3 x3 = x0 / (mat._33 * mat._33 - mat._35 * mat._35);
+        const real3 x4 = mat._43 * x3;
+        const real3 x5 = mat._45 * x3;
         
         r_b = mat._61 * x0 + x1 * x5 + x4 * x2;
         if (req & TM_TRANSFER_FACTOR_SECONDARY_FORWARD_REFLECTANCE)
@@ -181,20 +181,20 @@ void matrix_factors(tensor3d6x6 mat, inout float3 r, inout float3 r_f, inout flo
     }
 }
 
-void matrix_factors(tensor3d6x6 mat, inout float3 r, inout float3 r_f, inout float3 r_b, float3 r_cond, uint req)
+void matrix_factors(tensor3d6x6 mat, inout real3 r, inout real3 r_f, inout real3 r_b, real3 r_cond, uint req)
 {
-    const float3 x0 = 1.0f.xxx / (mat._11 + mat._12 * r_cond);
+    const real3 x0 = 1.0.xxx / (mat._11 + mat._12 * r_cond);
     if (req & TM_TRANSFER_FACTOR_SECONDARY_BACKWARD_REFLECTANCE)
     {
-        const float3 x1 = mat._45 + mat._46 * r_cond;
-        const float3 x2 = mat._31 + mat._32 * r_cond;
-        const float3 x3 = mat._35 + mat._36 * r_cond;
-        const float3 x4 = mat._33 + mat._34 * r_cond;
-        const float3 x5 = mat._51 + mat._52 * r_cond;
-        const float3 x6 = x0 / (-x3 * x3 + x4 * x4);
-        const float3 x7 = x6 * (x2 * x3 - x4 * x5);
-        const float3 x8 = mat._43 + mat._44 * r_cond;
-        const float3 x9 = x6 * (x2 * x4 - x3 * x5);
+        const real3 x1 = mat._45 + mat._46 * r_cond;
+        const real3 x2 = mat._31 + mat._32 * r_cond;
+        const real3 x3 = mat._35 + mat._36 * r_cond;
+        const real3 x4 = mat._33 + mat._34 * r_cond;
+        const real3 x5 = mat._51 + mat._52 * r_cond;
+        const real3 x6 = x0 / (-x3 * x3 + x4 * x4);
+        const real3 x7 = x6 * (x2 * x3 - x4 * x5);
+        const real3 x8 = mat._43 + mat._44 * r_cond;
+        const real3 x9 = x6 * (x2 * x4 - x3 * x5);
         
         r_b = x0 * (mat._61 + mat._62 * r_cond) - x1 * x9 + x7 * x8;
         if (req & TM_TRANSFER_FACTOR_SECONDARY_FORWARD_REFLECTANCE)
@@ -210,14 +210,14 @@ void matrix_factors(tensor3d6x6 mat, inout float3 r, inout float3 r_f, inout flo
 }
 
 
-void dielectric_transfer_factors(float3 incident, float ior_ij, float rough, out layer_components_tm6 ops)
+void dielectric_transfer_factors(float3 incident, real ior_ij, real rough, out layer_components_tm6 ops)
 {
-    float ior_ji = 0.0f;
-    float s_t_ij = 0.0f;
-    float s_t_ji = 0.0f;
+    real ior_ji = 0.0;
+    real s_t_ij = 0.0;
+    real s_t_ji = 0.0;
     ops = ops_zero_init();
     
-    if (abs(ior_ij - 1.0f) < 1e-5f)
+    if (abs(ior_ij - 1.0) < 1e-5f)
     {
         ops.type = TM_TYPE_NOCOMPONENT;
         ops.interface_type.transmission_down.mean = -incident;
@@ -225,7 +225,7 @@ void dielectric_transfer_factors(float3 incident, float ior_ij, float rough, out
     }
     
     ops.type = TM_TYPE_DIELECTRICINTERFACE;
-    ior_ji = 1.0f / ior_ij;
+    ior_ji = 1.0 / ior_ij;
     
     ops.interface_type.reflection_down.asymmetry = ggx_to_hg(rough);
     ops.interface_type.reflection_down.mean = reflectZ(incident);
@@ -250,7 +250,7 @@ void dielectric_transfer_factors(float3 incident, float ior_ij, float rough, out
     ops.interface_type.transmission_down_secondary = ops.interface_type.transmission_down;
 }
 
-void conductor_transfer_factors(float3 incident, float3 ior, float3 kappa, float rough, out layer_components_tm6 ops)
+void conductor_transfer_factors(float3 incident, real3 ior, real3 kappa, real rough, out layer_components_tm6 ops)
 {
     ops = ops_zero_init();
     ops.type = TM_TYPE_CONDUCTORINTERFACE;
@@ -262,37 +262,37 @@ void conductor_transfer_factors(float3 incident, float3 ior, float3 kappa, float
     ops.interface_type.reflection_down_secondary = ops.interface_type.reflection_down;
 }
 
-void medium_transfer_factors(float3 incident, float depth, float3 sigma_s, float3 sigma_k, float g, out layer_components_tm6 ops)
+void medium_transfer_factors(float3 incident, real depth, real3 sigma_s, real3 sigma_k, real g, out layer_components_tm6 ops)
 {
     ops = ops_zero_init();
     ops.type = TM_TYPE_HOMOGENOUSMEDIUM;
-    if (depth == 0.0f)
+    if (depth == 0.0)
     {
         ops.type = TM_TYPE_NOCOMPONENT;
         ops.interface_type.transmission_down.mean = -incident;
         return;
     }
     
-    float tau = depth / incident.z;
+    real tau = depth / incident.z;
     
-    const float3 sigma_sb = sigma_s * hg_lh_norm(g);
-    const float3 sigma_sf = sigma_s - sigma_sb;
-    const float3 sigma_ext = sigma_s + sigma_k;
+    const real3 sigma_sb = sigma_s * hg_lh_norm(g);
+    const real3 sigma_sf = sigma_s - sigma_sb;
+    const real3 sigma_ext = sigma_s + sigma_k;
     
     //Energy
     {
-        const float3 alpha = sigma_ext - sigma_sf;
-        const float3 beta = sigma_sb;
-        const float3 gamma = sqrt((alpha * alpha - beta * beta));
+        const real3 alpha = sigma_ext - sigma_sf;
+        const real3 beta = sigma_sb;
+        const real3 gamma = sqrt((alpha * alpha - beta * beta));
         
         tau = min(tau, TM_EXP_ARG_MAX / float3_max(gamma));
         tau = min(tau, TM_EXP_ARG_MAX / float3_max(sigma_ext));
         
-        const float3 S = sinh(gamma * tau);
-        const float3 C = sqrt(1.0f.xxx + S * S);
+        const real3 S = sinh(gamma * tau);
+        const real3 C = sqrt(1.0f.xxx + S * S);
         
-        const float3 x0 = exp(-sigma_ext * tau);
-        const float3 x1 = 1.0f.xxx / (C * gamma + S * alpha);
+        const real3 x0 = exp(-sigma_ext * tau);
+        const real3 x1 = 1.0f.xxx / (C * gamma + S * alpha);
         
         ops.media_type.primary_flux_transmission.norm = x0;
         ops.media_type.secondary_flux_backward_reflection.norm = S * beta * x1;
@@ -302,16 +302,16 @@ void medium_transfer_factors(float3 incident, float depth, float3 sigma_s, float
     
     //Asymmetry
     {
-        const float3 alpha = sigma_ext - sigma_sf * g;
-        const float3 beta = sigma_sb * -g;
-        const float3 gamma = sqrt(alpha * alpha - beta * beta);
+        const real3 alpha = sigma_ext - sigma_sf * g;
+        const real3 beta = sigma_sb * -g;
+        const real3 gamma = sqrt(alpha * alpha - beta * beta);
         
-        const float3 S = sinh(gamma * tau);
-        const float3 C = sqrt(1.0f.xxx + S * S);
+        const real3 S = sinh(gamma * tau);
+        const real3 C = sqrt(1.0.xxx + S * S);
         
-        const float3 x0 = 1.0f.xxx / (C * gamma + S * alpha);
+        const real3 x0 = 1.0.xxx / (C * gamma + S * alpha);
         
-        ops.media_type.primary_flux_transmission.asymmetry = 1.0f;
+        ops.media_type.primary_flux_transmission.asymmetry = 1.0;
 
         ops.media_type.secondary_flux_backward_reflection.asymmetry = float3_average(safe_div((S * beta * x0), (ops.media_type.secondary_flux_backward_reflection.norm)));
 
@@ -322,7 +322,7 @@ void medium_transfer_factors(float3 incident, float depth, float3 sigma_s, float
 
 void components_transfer_factors_tm6(float3 incident, LayerProperties props, out layer_components_tm6 ops[TM6_LOBE_MAX])
 {
-    float3 ior_ij;
+    real3 ior_ij;
     
     for (int i = 0; i < NumLayers; i++)
     {
@@ -355,40 +355,40 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
     
     layer_components_tm6 ops[TM6_LOBE_MAX];
     
-    float ior_ij = 0.0f;
-    float ior_ji = 0.0f;
-    float3 energy_reflect_i = 0.0f.xxx;
+    real ior_ij = 0.0;
+    real ior_ji = 0.0;
+    real3 energy_reflect_i = 0.0.xxx;
     
-    float3 energy_reflect_0h = 0.0f.xxx;
-    float3 energy_reflect_0i = 0.0f.xxx;
+    real3 energy_reflect_0h = 0.0.xxx;
+    real3 energy_reflect_0i = 0.0.xxx;
     
-    float3 energy_reflect_f_0h = 0.0f.xxx;
-    float3 energy_reflect_f_0i = 0.0f.xxx;
+    real3 energy_reflect_f_0h = 0.0.xxx;
+    real3 energy_reflect_f_0i = 0.0.xxx;
     
-    float3 energy_reflect_b_0h = 0.0f.xxx;
-    float3 energy_reflect_b_0i = 0.0f.xxx;
-    
-    
-    float3 asymmetry_reflect_0h = 0.0f.xxx;
-    float3 asymmetry_reflect_0i = 0.0f.xxx;
-    float3 asymmetry_reflect_f_0h = 0.0f.xxx;
-    float3 asymmetry_reflect_f_0i = 0.0f.xxx;
-    float3 asymmetry_reflect_b_0h = 0.0f.xxx;
-    float3 asymmetry_reflect_b_0i = 0.0f.xxx;
-    
-    float asymmetry_T_0i = 1.0f;
-    float asymmetry_T_0j = 1.0f;
-    float asymmetry_T_0j_R = 1.0f;
-    float asymmetry_T_0j_RT = 1.0f;
-    
-    float asymmetry_s_T_0i = 1.0f;
-    float asymmetry_s_T_0j = 1.0f;
-    float asymmetry_s_T_0j_R = 1.0f;
-    
-    float asymmetry_s_T_0j_RT = 1.0f; 
+    real3 energy_reflect_b_0i = 0.0.xxx;
+    real3 energy_reflect_b_0h = 0.0.xxx;
     
     
-    float3 TIR_norm = 0.0f.xxx;
+    real3 asymmetry_reflect_0h = 0.0.xxx;
+    real3 asymmetry_reflect_0i = 0.0.xxx;
+    real3 asymmetry_reflect_f_0h = 0.0.xxx;
+    real3 asymmetry_reflect_f_0i = 0.0.xxx;
+    real3 asymmetry_reflect_b_0h = 0.0.xxx;
+    real3 asymmetry_reflect_b_0i = 0.0.xxx;
+    
+    real asymmetry_T_0i = 1.0;
+    real asymmetry_T_0j = 1.0;
+    real asymmetry_T_0j_R = 1.0;
+    real asymmetry_T_0j_RT = 1.0;
+    
+    real asymmetry_s_T_0i = 1.0;
+    real asymmetry_s_T_0j = 1.0;
+    real asymmetry_s_T_0j_R = 1.0;
+    
+    real asymmetry_s_T_0j_RT = 1.0; 
+    
+    
+    real3 TIR_norm = 0.0.xxx;
     
     uint req = 0u; //what is this?
     
@@ -403,14 +403,14 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
     {
         if (ops[c].type == TM_TYPE_NOCOMPONENT)
         {
-            lobes[count].norm = 0.0f.xxx;
-            lobes[count].asymmetry = 0.0f;
+            lobes[count].norm = 0.0.xxx;
+            lobes[count].asymmetry = 0.0;
             lobe_incident[count++] = incident;
             continue;
         }
         else if (ops[c].type == TM_TYPE_DIELECTRICINTERFACE)
         {
-            const int i = c / 2.0f; //hmmm
+            const int i = c / 2.0; //hmmm
             ior_ij = float3_average((props.iors[i + 1] / props.iors[i]));
             ior_ji = 1.0f / ior_ij;
             
@@ -423,12 +423,12 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
             asymmetry_s_T_0j_RT = hg_refract(asymmetry_s_T_0j_R, ior_ij) * ops[c].interface_type.transmission_up_secondary.asymmetry;
             
             //downward transmission;
-            ops[c].interface_type.transmission_down.asymmetry = asymmetry_T_0i != 0.f ? asymmetry_T_0j/ asymmetry_T_0i : 0.0f;
-            ops[c].interface_type.transmission_down_secondary.asymmetry = asymmetry_s_T_0i != 0.0f ? asymmetry_s_T_0j / asymmetry_s_T_0i : 0.0f;
+            ops[c].interface_type.transmission_down.asymmetry = asymmetry_T_0i != 0.0 ? asymmetry_T_0j/ asymmetry_T_0i : 0.0;
+            ops[c].interface_type.transmission_down_secondary.asymmetry = asymmetry_s_T_0i != 0.0 ? asymmetry_s_T_0j / asymmetry_s_T_0i : 0.0;
             
             //upward transmission
-            ops[c].interface_type.transmission_up.asymmetry = asymmetry_T_0j_R != 0.0f ? asymmetry_T_0j_RT / asymmetry_T_0j_R : 0.0f;
-            ops[c].interface_type.transmission_up_secondary.asymmetry = asymmetry_s_T_0j_R != 0.0f ? asymmetry_s_T_0j_RT / asymmetry_s_T_0j_R : 0.0f;
+            ops[c].interface_type.transmission_up.asymmetry = asymmetry_T_0j_R != 0.0 ? asymmetry_T_0j_RT / asymmetry_T_0j_R : 0.0;
+            ops[c].interface_type.transmission_up_secondary.asymmetry = asymmetry_s_T_0j_R != 0.0 ? asymmetry_s_T_0j_RT / asymmetry_s_T_0j_R : 0.0;
             
             
             //simplification? drop TIR correction?
@@ -497,7 +497,7 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
         {
             energy_reflect_i = energy_reflect_0i - energy_reflect_0h;
             
-            lobes[count].norm = max(energy_reflect_i, 0.0f.xxx);
+            lobes[count].norm = max(energy_reflect_i, 0.0.xxx);
 
             lobes[count].asymmetry = float3_average(safe_div((asymmetry_reflect_0i - asymmetry_reflect_0h), energy_reflect_i));
 
@@ -508,7 +508,7 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
         {
             energy_reflect_i = energy_reflect_f_0i - energy_reflect_f_0h;
             
-            lobes[count].norm = max(energy_reflect_i, 0.0f);
+            lobes[count].norm = max(energy_reflect_i, 0.0);
             lobes[count].asymmetry = float3_average(safe_div((asymmetry_reflect_f_0i - asymmetry_reflect_f_0h), energy_reflect_i));
             lobe_incident[count++] = incident;
         }
@@ -517,7 +517,7 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
         {
             energy_reflect_i = energy_reflect_b_0i - energy_reflect_b_0h;
             
-            lobes[count].norm = max(energy_reflect_i, 0.0f.xxx);
+            lobes[count].norm = max(energy_reflect_i, 0.0.xxx);
             lobes[count].asymmetry = float3_average(safe_div((asymmetry_reflect_b_0i - asymmetry_reflect_b_0h), energy_reflect_i));
             lobe_incident[count++] = incident_reflect;
 
@@ -540,78 +540,12 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
 
 }
 
-float3 eval(sample_record rec, uint measure, LayerProperties props)
-{
-    if (measure != TM_MEASURE_SOLID_ANGLE || rec.incident.z <= 0 || rec.outgoing.z <= 0)
-    {
-        return EVAL_DEBUG;
-    }
-    
-    float3 H = normalize(rec.incident + rec.outgoing);
-    
-    henyey_greenstein lobes[TM6_LOBE_MAX];
-    float3 lobes_incident[TM6_LOBE_MAX];
-    for (int k = 0; k < TM6_LOBE_MAX; k++)
-    {
-        lobes_incident[k] = 0.0f.xxx;
-        lobes[k] = zero_hg();
-    }
-    
-    const int lobe_count = outgoing_lobes(rec.incident, props, lobes, lobes_incident);
-    
-    float3 throughput = 0.f.xxx;
-    
-    if (!isZero(lobes[0].norm))
-    {
-        const float G2 = smithG(rec.incident, rec.outgoing, H, props.rough[1]);
-        const float D = D_GGX(H, props.rough[1]);
-        
-        float3 F;
-        float3 ior_01 = props.iors[1] / props.iors[0];
-        if (isZero(props.kappas[1]))
-        {
-            F = fresnelDielectric(dot(rec.incident, H), float3_average(ior_01)).xxx;
-        }
-        else
-        {
-            F = fresnelConductorExact(dot(rec.incident, H), ior_01, props.kappas[1] / props.iors[0]);
-        }
-        throughput += F * G2 * D / (4.0f * rec.incident.z);
-    }
-    
-    for (int i = 1; i < lobe_count; i++)
-    {
-        if (isZero(lobes[i].norm))
-        {
-            continue;
-        }
-        
-        const float3 incident = lobes_incident[i];
-        
-        H = normalize(incident + rec.outgoing);
-        
-        const float rough = hg_to_ggx(lobes[i].asymmetry);
-        
-        const float G2 = smithG(incident, rec.outgoing, H, rough);
-        const float D = D_GGX(H, rough);
-        
-        const float essi = sample_GD(incident.z, rough);
-        
-        const float f = G2 * D / (4.0f * incident.z * essi);
-        
-        throughput += lobes[i].norm * f;
-        
-    }
-
-    return throughput;
-}
-
 float3 eval_lobe(float3 incident, float3 outgoing, henyey_greenstein lobe)
 {
     float3 H = normalize(incident + outgoing);
-    const float rough = hg_to_ggx(lobe.asymmetry);
-    const float G2 = smithG(incident, outgoing, H, rough);
-    const float D = D_GGX(H, rough);
+    const real rough = hg_to_ggx(lobe.asymmetry);
+    const real G2 = smithG(incident, outgoing, H, rough);
+    const real D = D_GGX(H, rough);
     
     const float essi = sample_GD(incident.z, rough);
     
@@ -628,15 +562,15 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
     float3 lobe_incident[TM6_LOBE_MAX];
     for (int k = 0; k < TM6_LOBE_MAX; k++)
     {
-        lobe_incident[k] = 0.0f.xxx;
+        lobe_incident[k] = 0.0.xxx;
         lobes[k] = zero_hg();
     }
     
     
     const int lobe_count = outgoing_lobes(rec.incident, props, lobes, lobe_incident);
     
-    float3 throughput = 0.0f.xxx;
-    float weight_sum = 0.0f;
+    real3 throughput = 0.0.xxx;
+    real weight_sum = 0.0;
     for (int l = 0; l < lobe_count; l++)
     {
         weight_sum += float3_average(lobes[l].norm);
@@ -646,7 +580,7 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
     
     
     
-    const float3 H = float3(0.f, 0.f, 1.0f);
+    const float3 H = float3(0., 0., 1.0);
     for (int i = 0; i < lobe_count; i++)
     {
         if (!isZero(lobes[i].norm))
@@ -685,7 +619,7 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
         
             if (i == 0)
             {
-                const float3 H = float3(0.f, 0.f, 1.f); //mirror reflection about normal, 
+                const float3 H = float3(0., 0., 1.); //mirror reflection about normal, 
                     //as using preintegrated lighting.
                 rec.outgoing = reflectSpherical(rec.incident, H);
         
@@ -731,74 +665,6 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
 }
 
 
-
-float3 sample(sample_record rec, out float pdf, out float out_rough, float2 samplePoint, float Hammersley, LayerProperties props)
-{
-    henyey_greenstein lobes[TM6_LOBE_MAX];
-    float3 lobe_incident[TM6_LOBE_MAX];
-    
-    const int lobe_count = outgoing_lobes(rec.incident, props, lobes, lobe_incident);
-    
-    float weight[TM6_LOBE_MAX];
-    float weight_sum = 0.0f;
-    
-    for (int i = 0; i < lobe_count; i++)
-    {
-        weight[i] = float3_average(lobes[i].norm);
-        weight_sum += weight[i];
-    }
-    
-    float selection_weight = Hammersley * weight_sum - weight[0];
-    int selection_index = 0;
-    for (selection_index = 0; selection_weight > 0.0f && selection_index < lobe_count; selection_index++)
-    {
-        selection_weight -= weight[selection_index + 1];
-    }
-    
-    const float selection_rough = hg_to_ggx(lobes[selection_index].asymmetry);
-    
-    float3 selection_incident = lobe_incident[selection_index];
-    
-    float3 H = sample_GGX(samplePoint, selection_rough, pdf);
-    
-    rec.outgoing = reflectSpherical(selection_incident, H);
-    rec.ior = 1.0f;
-    rec.is_reflection_sample = 0;
-    rec.sample_type = TM_SAMPLE_TYPE_GLOSSY_REFLECTION;
-    
-    if (rec.outgoing.z <= 0.0f || pdf <= 0.0f)
-    {
-        return PDF_DEBUG;
-    }
-    
-    pdf = 0.0f;
-    for (int i = 0; i < lobe_count; i++)
-    {
-        if (weight[i] == 0.0f)
-        {
-            continue;
-        }
-        
-        float3 incident = lobe_incident[i];
-        H = normalize(incident + rec.outgoing);
-        
-        const float rough = hg_to_ggx(lobes[i].asymmetry);
-        out_rough += rough * weight[i];
-        
-        const float G1 = smithG1(incident, H, rough); 
-        const float D = D_GGX(H, rough);
-        
-        pdf += weight[i] * G1 * D / (4.0f * incident.z);
-    }
-    
-    pdf /= weight_sum;
-    
-    float3 throughput = eval(rec, TM_MEASURE_SOLID_ANGLE, props);
-    
-    return pdf > 0.0f ? throughput / pdf : PDF_DEBUG;
-}
-
-
 float4 main(VSOutput vsOutput) : SV_Target0
 {
     float3 normal = normalize(vsOutput.normal);
@@ -823,13 +689,6 @@ float4 main(VSOutput vsOutput) : SV_Target0
     };
     
     
-    float gs[LAYERS_MAX] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
-    float depths_debug[LAYERS_MAX] = { 1.0f, 1.0f, 1.0f, 1.0f, 1.0f };
-    float rough_debug[LAYERS_MAX] = { 0.0f, 0.01f, 0.1f, 0.0f, 0.0f};
-    
-    float3 Kappa_debug[LAYERS_MAX] = { 0.0f.xxx, float3(1.0f, 0.1f, 0.1f), 0.0f.xxx, 0.0f.xxx, 0.0f.xxx };
-    float3 IOR_debug[LAYERS_MAX] = { 1.003f.xxx, 1.0f.xxx, 1.5f.xxx, 0.0f.xxx, 0.0f.xxx };
-    float3 sigma_debug[LAYERS_MAX] = { 1.0f.xxx, 0.0f.xxx, 0.0f.xxx, 0.0f.xxx, 0.0f.xxx };
     
     LayerProperties props;
     props.iors = IORs;
@@ -844,26 +703,10 @@ float4 main(VSOutput vsOutput) : SV_Target0
             
    float3 output = sample_preintegrated(rec, TangentToWorld, props);
     
-    henyey_greenstein lobes[TM6_LOBE_MAX];
-    float3 lobe_incident[TM6_LOBE_MAX];
-    for (int k = 0; k < TM6_LOBE_MAX; k++)
+    if (any(isnan(output)))
     {
-        lobes[k] = zero_hg();
-        lobe_incident[k] = 0.0f.xxx;
+        output = 0.0.xxx;
     }
-    const int num_lobes = outgoing_lobes(rec.incident, props, lobes, lobe_incident);
-    
-    //float3 output = 0.0f;
-    for (int l = 0; l < num_lobes; l++)
-    {
-        output += isinf(lobes[l].norm).xxx;
-    }
-    
-    //layer_components_tm6 ops[TM6_LOBE_MAX];
-    //components_transfer_factors_tm6(rec.incident, props, ops);
-    
-    
-   
 	
     return float4(output, 1.0f);
 }

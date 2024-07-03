@@ -1,23 +1,25 @@
 
 #pragma once
+#include "../Common.hlsli"
 
-static const float PI = 3.14159265f;
+static const float PI = 3.14159265;
+static const min16float HALF_PI = 3.14159265;
 
 
 ///RGB variant of henyey greenstein?
 struct henyey_greenstein
 {
-    float asymmetry;
-    float3 mean;
-    float3 norm;
+    real asymmetry;
+    real3 mean;
+    real3 norm;
 };
 
 henyey_greenstein zero_hg()
 {
     henyey_greenstein h;
-    h.asymmetry = 0.0f;
-    h.mean = 0.0f.xxx;
-    h.norm = 0.0f.xxx;
+    h.asymmetry = 0.0;
+    h.mean = 0.0.xxx;
+    h.norm = 0.0.xxx;
     return h;
 }
 
@@ -36,23 +38,23 @@ float henyey_greenstein_phase_function(float theta, float g)
 
 ///Equation 15
 ///Translates ggx roughness param to henyey greenstein asymmetry param.
-float ggx_to_hg(float rough)
+real ggx_to_hg(real rough)
 {
     rough = saturate(rough);
-    return -0.085f + ((1.085f) / (1.0f + pow((rough / 0.5f), 1.3f)));
+    return -0.085 + ((1.085) / (1.0 + pow((rough / 0.5), 1.3)));
 
 }
 
-float hg_to_ggx(float asymmetry)
+real hg_to_ggx(real asymmetry)
 {
     asymmetry = clamp(asymmetry,-1.0f, 1.0f);
-    return clamp(0.5f * pow((1.085f) / (max(asymmetry, 0.2f) + 0.085f) - 1.0f, 1.0f / 1.3f), 1e-4f, 1.f);
+    return clamp(0.5 * pow((1.085) / (max(asymmetry, 0.2) + 0.085) - 1.0, 1.0 / 1.3), 1e-4, 1.);
 
 }
 
-float hg_refract(float asymmetry, float ior)
+real hg_refract(real asymmetry, real ior)
 {
-    return min(sqrt(max(1.0f - (1.0f - asymmetry * asymmetry) * pow(ior, 0.75f), 0.0f)), 1.0f);
+    return min(sqrt(max(1.0 - (1.0 - asymmetry * asymmetry) * pow(ior, 0.75), 0.0)), 1.0);
 }
 
 //equation 16

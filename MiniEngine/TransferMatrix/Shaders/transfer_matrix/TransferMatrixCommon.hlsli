@@ -18,6 +18,7 @@
 #define NO_SECOND_UV 1
 
 #define EPSILON 1e-6f
+#define HALFEPSILON 2E-10
 
 
 struct sample_record
@@ -94,6 +95,15 @@ struct VSOutput
     float3 sunShadowCoord : TEXCOORD3;
 };
 
+
+min16float hg_lh_norm(min16float g)
+{
+    const bool g_neg = g < 0.f;
+    g = abs(g);
+    const min16float n = clamp(0.5039 - 0.8254 * g + 0.3226 * g * g, 0.0, 0.5);
+    return g_neg ? 1.0 - n : n;
+}
+
 float hg_lh_norm(float g)
 {
     const bool g_neg = g < 0.f;
@@ -102,10 +112,25 @@ float hg_lh_norm(float g)
     return g_neg ? 1.0f - n : n;
 }
 
+min16float safe_div(min16float n, min16float d)
+{
+    return abs(d) > EPSILON ? n / d : 0.0;
+}
 
 float safe_div(float n, float d)
 {
     return abs(d) > EPSILON ? n / d : 0.f;
+}
+
+min16float3 safe_div(min16float3 n, min16float3 d)
+{
+    
+    min16float3 r;
+    r.x = abs(d.x) > EPSILON ? n.x / d.x : 0.0;
+    r.y = abs(d.y) > EPSILON ? n.y / d.y : 0.0;
+    r.z = abs(d.z) > EPSILON ? n.z / d.z : 0.0;
+    return r;
+    
 }
 
 float3 safe_div(float3 n, float3 d)
@@ -117,9 +142,19 @@ float3 safe_div(float3 n, float3 d)
     return r;
 }
 
+bool isZero(min16float3 vec)
+{
+    return vec.x + vec.y + vec.z == 0.0;
+}
+
 bool isZero(float3 vec)
 {
     return vec.x + vec.y + vec.z == 0.0f;
+}
+
+min16float float3_max(min16float3 v)
+{
+    return max(v.x, max(v.y, v.z));
 }
 
 float float3_max(float3 v)
@@ -127,6 +162,10 @@ float float3_max(float3 v)
     return max(v.x, max(v.y, v.z));
 }
 
+min16float float3_average(min16float3 f)
+{
+    return (f.x + f.y + f.z) / 3.0;
+}
 
 float float3_average(float3 f)
 {
@@ -135,10 +174,21 @@ float float3_average(float3 f)
 
 }
 
+min16float copy_sign(min16float x, min16float s)
+{
+    return (s >= 0) ? abs(x) : -abs(x);
+}
+
 float copy_sign(float x, float s)
 {
     return (s >= 0) ? abs(x) : -abs(x);
 
+}
+
+min16float3 reflectSpherical(min16float3 incident, min16float3 normal)
+{
+    return 2.0 * dot(incident, normal) * normal - incident;
+    
 }
 
 float3 reflectSpherical(float3 incident, float3 normal)
@@ -146,9 +196,19 @@ float3 reflectSpherical(float3 incident, float3 normal)
     return 2 * dot(incident, normal) * normal - incident;
 }
 
+min16float3 reflectZ(min16float3 f)
+{
+    return min16float3(-f.xy, f.z);
+}
+
 float3 reflectZ(float3 f)
 {
     return float3(-f.xy, f.z);
+}
+
+min16float3 refractZ(min16float3 f, min16float ior)
+{
+    return refract(f, min16float3(0.0, 0.0, copy_sign(1.0, f.z)), ior);
 }
 
 float3 refractZ(float3 f, float ior)
@@ -157,9 +217,19 @@ float3 refractZ(float3 f, float ior)
 
 }
 
+min16float tanTheta(min16float3 v)
+{
+    return max(0, sqrt(1.0 - v.z * v.z) / v.z);
+}
+
 float tanTheta(float3 v)
 {
     return max(0, sqrt(1 - v.z * v.z) / v.z);
+}
+
+min16float sinTheta(min16float3 v)
+{
+    return max(0.0, sqrt(1.0 - v.z * v.z));
 }
 
 float sinTheta(float3 v)
@@ -167,14 +237,30 @@ float sinTheta(float3 v)
     return max(0, sqrt(1.0f - v.z * v.z));
 }
 
+min16float sinTheta2(min16float3 v)
+{
+    return 1.0 - v.z * v.z;
+}
+
 float sinTheta2(float3 v)
 {
     return 1.0f - v.z * v.z;
 }
 
+min16float cosTheta2(min16float3 v)
+{
+    return v.z * v.z;
+}
+
 float cosTheta2(float3 v)
 {
     return v.z * v.z;
+}
+
+min16float Pow5(min16float x)
+{
+    min16float xSq = x * x;
+    return xSq * xSq * x;
 }
 
 float Pow5(float x)
@@ -286,6 +372,31 @@ float3 f0(float3 ior)
 
 
 
+//based off mitsuba 3 implementation
+min16float fresnelDielectric(min16float incidentCosTheta, min16float ior)
+{
+    min16float transmittedCosTheta = 0.0;
+    if (ior == 1.0)
+    {
+        return 0.0;
+    }
+    
+    min16float scale = (incidentCosTheta > 0) ? 1.0 / ior : ior;
+    min16float transmittedcosTheta2 = 1.0 - (1.0 - incidentCosTheta * incidentCosTheta) * (scale * scale);
+    
+    if (transmittedcosTheta2 <= 0.0)
+    {
+        return 1.0;
+    }
+    
+    incidentCosTheta = abs(incidentCosTheta);
+    transmittedCosTheta = sqrt(transmittedcosTheta2);
+    
+    min16float Rs = (incidentCosTheta - ior * transmittedCosTheta) / (incidentCosTheta + ior * transmittedCosTheta);
+    min16float Rp = (ior * incidentCosTheta - transmittedCosTheta) / (ior * incidentCosTheta + transmittedCosTheta);
+    
+    return 0.5 * (Rs * Rs + Rp * Rp);
+}
 
 //based off mitsuba 3 implementation
 float fresnelDielectric(float incidentCosTheta, float ior)
@@ -326,27 +437,27 @@ float Fresnel_Shlick(float F0, float F90, float cosine)
     return lerp(F0, F90, Pow5(1.0 - cosine));
 }
 
-float3 fresnelConductorExact(float incidentCosTheta, float3 ior, float3 kappa)
+real3 fresnelConductorExact(real incidentCosTheta, real3 ior, real3 kappa)
 {
-    float incidentCosTheta2 = incidentCosTheta * incidentCosTheta;
-    float sinTheta2 = 1.0f - incidentCosTheta2;
-    float sinTheta4 = sinTheta2 * sinTheta2;
+    real incidentCosTheta2 = incidentCosTheta * incidentCosTheta;
+    real sinTheta2 = 1.0 - incidentCosTheta2;
+    real sinTheta4 = sinTheta2 * sinTheta2;
     
-    float3 temp1 = ior * ior - kappa * kappa - sinTheta2.xxx;
-    float3 a2pb2 = sqrt((temp1 * temp1 + kappa * kappa * ior * ior * 4.0f.xxx));
-    float3 a = sqrt(((a2pb2 + temp1) * 0.5f));
+    real3 temp1 = ior * ior - kappa * kappa - sinTheta2.xxx;
+    real3 a2pb2 = sqrt((temp1 * temp1 + kappa * kappa * ior * ior * 4.0.xxx));
+    real3 a = sqrt(((a2pb2 + temp1) * 0.5));
     
-    float3 term1 = a2pb2 + incidentCosTheta2.xxx;
-    float3 term2 = a * (2.0f * incidentCosTheta);
+    real3 term1 = a2pb2 + incidentCosTheta2.xxx;
+    real3 term2 = a * (2.0 * incidentCosTheta);
     
-    float3 Rs2 = (term1 - term2) / (term1 + term2);
+    real3 Rs2 = (term1 - term2) / (term1 + term2);
     
-    float3 term3 = a2pb2 * incidentCosTheta2 + sinTheta4.xxx;
-    float3 term4 = term2 * sinTheta2;
+    real3 term3 = a2pb2 * incidentCosTheta2 + sinTheta4.xxx;
+    real3 term4 = term2 * sinTheta2;
     
-    float3 Rp2 = Rs2 * (term3 - term4) / (term3 + term4);
+    real3 Rp2 = Rs2 * (term3 - term4) / (term3 + term4);
     
-    return 0.5f * (Rp2 + Rs2);
+    return 0.5 * (Rp2 + Rs2);
 }
 
 float3 fresnelConductorApprox(float cosThetaI, float3 ior, float3 kappa)
@@ -390,6 +501,28 @@ float3 sample_GGX(float2 sample, float alpha, out float pdf)
 }
 
 //assume isotropic
+min16float smithG1(min16float3 v, min16float3 m, min16float alpha)
+{
+    //v.z == Frame::cosTheta
+    if (dot(v, m) * v.z <= 0.0f)
+    {
+        return 0.0;
+    }
+    
+    min16float tantheta = abs(tanTheta(v));
+    if (tantheta <= 0.0) //TODO: almost equal op...
+    {
+        return 1.0;
+    }
+    
+    
+    min16float root = alpha * tantheta;
+                    //hypot2
+    return saturate(2.0 / (1.0 + 1.0 * 1.0 + root * root));
+
+}
+
+//assume isotropic
 float smithG1(float3 v, float3 m, float alpha)
 {
     //v.z == Frame::cosTheta
@@ -411,6 +544,21 @@ float smithG1(float3 v, float3 m, float alpha)
 
 }
 
+min16float D_GGX(min16float3 m, min16float alpha)
+{
+    if (m.z <= 0.0)
+    {
+        return 0.0;
+    }
+    alpha = max(HALFEPSILON, alpha);
+    
+    min16float costheta2 = cosTheta2(m);
+    min16float beckmann = (((m.x * m.x) / (alpha * alpha) + (m.y * m.y) / (alpha * alpha)) / costheta2);
+    
+    min16float root = (1.0 + beckmann) * costheta2;
+    return (1.0 / (HALF_PI * alpha * alpha * root * root));
+
+}
 
 
 float D_GGX(float3 m, float alpha)

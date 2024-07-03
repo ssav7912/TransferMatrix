@@ -126,7 +126,7 @@
       <HeaderFileOutput>$(SolutionDir)..\Build\$(Platform)\$(Configuration)\Output\$(ProjectName)\CompiledShaders\%(Filename).h</HeaderFileOutput>
       <ObjectFileOutput />
       <ShaderModel>6.5</ShaderModel>
-      <PreprocessorDefinitions>USE_FAST_FGD=0</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_FAST_FGD=0; USEFP16=1</PreprocessorDefinitions>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -150,7 +150,7 @@
       <ShaderModel>6.5</ShaderModel>
       <VariableName>g_p%(Filename)</VariableName>
       <HeaderFileOutput>$(SolutionDir)..\Build\$(Platform)\$(Configuration)\Output\$(ProjectName)\CompiledShaders\%(Filename).h</HeaderFileOutput>
-      <PreprocessorDefinitions>USE_FAST_FGD=0</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_FAST_FGD=0; USEFP16=1</PreprocessorDefinitions>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>

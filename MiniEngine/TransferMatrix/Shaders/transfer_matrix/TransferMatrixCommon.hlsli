@@ -30,9 +30,18 @@ struct sample_record
     bool sample_type;
 };
 
+//Texture Arrays for textured impl.
+Texture2DArray<float3> IORs;
+Texture2DArray<float3> Kappas;
+Texture2DArray<float3> Sigma_S;
+Texture2DArray<float3> Sigma_K;
+Texture2DArray<float> Depths;
+Texture2DArray<float> Phase;
+Texture2DArray<float> Roughs;
+
 
 //Lookup table for Total Internal Reflection
-Texture3D<float> TIR_LUT : register(t18);
+Texture3D<real> TIR_LUT : register(t18);
 
 //compile time switch for (Karis 2013). split sum FGD approx, or the (Belcour 2018). FGD LUT.
 #if USE_FAST_FGD == 1
@@ -41,6 +50,7 @@ Texture2D<float2> FGD_LUT : register(t19);
 #else
 Texture3D<float> FGD_LUT : register(t20);
 #endif
+
 Texture2D<float> GD_LUT : register(t21);
 
 
@@ -358,7 +368,7 @@ float3 MitsubaLSToCartesianTS(float3 mitsuba)
 
 
 //TODO: Probably drop TIR for being too expensive.
-float3 TIR_lookup(float3 coords)
+real3 TIR_lookup(float3 coords)
 {
     return TIR_LUT.Sample(LUTSampler, coords);
 }
@@ -678,7 +688,6 @@ float D_GGX_Karis(float NdotH, float rough)
     return rough_square / (PI * f * f);
 }
 
-
 float smithG(float3 incident, float3 outgoing, float3 m, float rough)
 {
     return smithG1(incident, m, rough) * smithG1(outgoing, m, rough);
@@ -702,7 +711,7 @@ float3 Dim4ToDim3(float4 coord, uint dimension)
     return float3(coord.x, coord.y, coord.z + (coord.w * dimension));
 }
 
-float3 sample_FGD(float cti, float alpha, float3 ior, float3 kappa)
+real3 sample_FGD(float cti, real alpha, real3 ior, real3 kappa)
 {
     float3 output = 0.0f.xxx;
 #if USE_FAST_FGD == 1
@@ -717,7 +726,7 @@ float3 sample_FGD(float cti, float alpha, float3 ior, float3 kappa)
     
     //this crushes up the energy for dielectrics...
     //why doesn't this warn?
-     output = (splitsum.x + f0(ior).x * splitsum.y).xxx;
+     output = (splitsum.x + float3_average(f0(ior)) * splitsum.y).xxx;
 #else
     static const uint DimensionXY = 64;
     static const uint DimensionZ = DimensionXY * 32;
@@ -754,41 +763,67 @@ float3 sample_FGD(float cti, float alpha, float3 ior, float3 kappa)
     return output;
 }
 
+//could i just reuse the FGD LUT for this?
 float sample_GD(float cti, float rough)
 {
     return GD_LUT.Sample(LUTSampler, float2(cti, rough));
 }
 
-void albedos(float cti, float alpha, float ior_ij, out float3 r_ij, out float3 t_ij, out float3 r_ji, out float3 t_ji)
+
+
+void albedos(float cti, real alpha, real ior_ij, out real3 r_ij, out real3 t_ij, out real3 r_ji, out real3 t_ji)
 {
-    if (abs(ior_ij - 1.0f) < 1e-3f)
+    if (abs(ior_ij - 1.0) < 1e-3)
     {
-        r_ij = 0.0f.xxx;
-        r_ji = 0.0f.xxx;
+        r_ij = 0.0.xxx;
+        r_ji = 0.0.xxx;
         
-        t_ij = 1.0f.xxx;
-        t_ji = 1.0f.xxx;
+        t_ij = 1.0.xxx;
+        t_ji = 1.0.xxx;
         return;
     }
     
 
-    r_ij = sample_FGD(cti, alpha, ior_ij.xxx, 0.0f.xxx);
+    r_ij = sample_FGD(cti, alpha, ior_ij.xxx, 0.0.xxx);
     
     
     r_ji = r_ij;
     
     //somehow this is 0. FGD LUT does have 1.0 values... Possible to hit them??
-    t_ij = 1.0f.xxx - r_ij; //can't be negative
+    t_ij = 1.0.xxx - r_ij; //can't be negative
     t_ji = t_ij;
     
 }
 
 
 
-void albedo(float cti, float alpha, float3 ior_ij, float3 kappa_ij, out float3 r_ij)
+void albedo(float cti, real alpha, real3 ior_ij, real3 kappa_ij, out real3 r_ij)
 {
     //can't be negative! 
     
     r_ij = sample_FGD(cti, alpha, ior_ij, kappa_ij);
 
+}
+
+// [Lagarde & De Rousiers, 2014] Moving Frostbite to Physically Based Rendering 3.0
+//Lobe off-peak shift correction (Section 4.9.3)
+float3 lobe_mean_shift(float3 incident, float masking_shadowing, float3 Normal)
+{
+    return masking_shadowing * Normal + (1.0 - masking_shadowing) * incident;
+}
+
+float3 specular_dominant(float3 normal, float3 outgoing, float NdotV, float rough)
+{
+    float lerpFactor = pow(1 - NdotV, 10.8649) * (1 - 0.298475 * log(39.4115 - 39.0029 * rough))
+        + 0.298475 * log(39.4115 - 39.0029 * rough);
+    
+    return lerp(normal, outgoing, lerpFactor);
+}
+
+// [Lagarde & De Rousiers, 2014]
+float3 specular_dominant_approx(float3 normal, float3 outgoing, float rough)
+{
+    float smooth = saturate(1.0 - rough);
+    float lerpFactor = smooth * (sqrt(smooth) + rough);
+    return lerp(normal, outgoing, lerpFactor); 
 }

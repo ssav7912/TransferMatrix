@@ -77,7 +77,9 @@ void outgoing_lobes(float3 incident, float3 ior[LAYERS_MAX], float3 kappas[LAYER
             ops[i].transmission_down.asymmetry = asymmetry_T_0i != 0.0 ? asymmetry_T_0j / asymmetry_T_0i : 0.0;
             
             ops[i].transmission_up.asymmetry = asymmetry_T_0j_R != 0.0 ? asymmetry_T_0j_RT / asymmetry_T_0j_R : 0.0;
-            
+        
+            //toggle to disable the TIR correction. Breaks conservation but seems to massively improrve performance.
+#if !defined(DISABLE_TIR) || DISABLE_TIR == 0
             if (ior_ij < 1.0)
             {
                 tir_norm = TIR_lookup(float3(abs(ops[i].reflection_down.mean.z), hg_to_ggx(asymmetry_T_0i), ior_ij)) * ops[i].transmission_down.norm;
@@ -91,8 +93,9 @@ void outgoing_lobes(float3 incident, float3 ior[LAYERS_MAX], float3 kappas[LAYER
                 
                 ops[i].reflection_up.norm += tir_norm;
                 ops[i].transmission_up.norm -= tir_norm; //could go negative if transfer_factors produces negative norm?
-
+            
             }
+#endif
             
             
             energy_0i = mul(energy_0i, energy_matrix(ops[i])); //transmission_down.norm == 0?
@@ -124,13 +127,13 @@ void outgoing_lobes(float3 incident, float3 ior[LAYERS_MAX], float3 kappas[LAYER
 
 }
 
-float3 eval_lobe(sample_record rec, henyey_greenstein lobe)
+float3 eval_lobe(const sample_record rec, const henyey_greenstein lobe)
 {
     
     const float3 H = normalize(rec.incident + rec.outgoing);
 
 
-    if (lobe.norm.x + lobe.norm.y + lobe.norm.z == 0.0f)
+    if (lobe.norm.x + lobe.norm.y + lobe.norm.z == 0.0)
     {
         return 0.0;
     }
@@ -153,9 +156,28 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, fl
         return PDF_DEBUG;
     }
     
+    const float3 H = float3(0.f, 0.f, 1.f); //mirror reflection about normal, 
+            //as using preintegrated lighting.
+    
+
+    
+    
+    
     //get the outgoing lobes
     henyey_greenstein lobes[LAYERS_MAX];
     outgoing_lobes(rec.incident, iors, kappas, roughs, lobes);
+    
+        //shift the outgoing lobe direction to correct for lobe mean.
+        
+    rec.outgoing = reflectSpherical(rec.incident, H);
+
+
+    
+    if (rec.outgoing.z <= 0.0f)
+    {
+        return EVAL_DEBUG;
+    }
+    
     
     
     float3 throughput = 0.0;
@@ -166,24 +188,20 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, fl
         weight_sum += float3_average(lobes[k].norm);
     }
     
-    const float3 H = float3(0.f, 0.f, 1.f); //mirror reflection about normal, 
-            //as using preintegrated lighting.
-    rec.outgoing = reflectSpherical(rec.incident, H);
-    
-    if (rec.outgoing.z <= 0.0f)
-    {
-      return EVAL_DEBUG;
-    }
 
     
+
+    [loop]
     for (int i = 0; i < NumLayers; i++)
     {
         if (!isZero(lobes[i].norm))
         {
+            
         
             float3 lobe_throughput = 0.0f;
             float lobe_weight = float3_average(lobes[i].norm);
             const float rough = hg_to_ggx(lobes[i].asymmetry);
+           
      
             rec.ior = 1.0f;
             rec.is_reflection_sample = false;
@@ -203,18 +221,25 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, fl
                 const float G1 = smithG1(incoming, H, rough);
                 const float D = D_GGX(H, rough);
             
-                lobe_pdf = (lobe_weight * G1 * D / (4.0f * incoming.z)) / weight_sum;
+                lobe_pdf = (lobe_weight * G1 * D / (4.0 * incoming.z)) / weight_sum;
             }
         
         
             if (i == 0)
             {
-            //top reflection correction. [Bati 2019]
-            
-                const float G2_0 = smithG(rec.incident, rec.outgoing, H, roughs[1]);
-                const float D0_0 = D_GGX(H, roughs[1]);
-                float3 F0 = 0.0.xxx;
-                const float3 ior_01 = iors[1] / iors[0];
+                //top reflection correction. [Bati 2019]
+                const float BottomRough = roughs[1];
+                float G = smithG(rec.incident, rec.outgoing, H, BottomRough);
+                const float3 TopLobeOutgoing = specular_dominant(H, rec.outgoing, dot(H, rec.incident), BottomRough);
+                
+                const float3 topOutgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(TopLobeOutgoing));
+                const float BottomLOD = BottomRough * IBLRange + IBLBias;
+                const float3 TopIBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, topOutgoingWS, BottomLOD);
+
+                const real G2_0 = smithG(rec.incident, rec.outgoing, H, roughs[1]);
+                const real D0_0 = D_GGX(H, roughs[1]);
+                real3 F0 = 0.0.xxx;
+                const real3 ior_01 = iors[1] / iors[0];
                 if (isZero(kappas[1]))
                 {
                     F0 = fresnelDielectric(dot(rec.incident, H), float3_average(ior_01));
@@ -223,24 +248,23 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, fl
                 {
                     F0 = fresnelConductorExact(dot(rec.incident, H), ior_01, kappas[1] / iors[0]);
                 }
-                const float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(rec.outgoing));
-                const float BottomRough = roughs[1];
-                const float BottomLOD = BottomRough * IBLRange + IBLBias;
-                const float3 TopIBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, outgoingWS, BottomLOD);
+
                 throughput += ((F0 * G2_0 * D0_0 / (4.0f * rec.incident.z)) / lobe_pdf) * TopIBLSample;
             }
               
-        //only evaluate layers when not in air-substrate interface.
+             //only evaluate layers when not in air-substrate interface.
             if (i >= 1)
             {
-            //throughput
-                lobe_throughput += eval_lobe(rec, lobes[i]);
-            //sample the IBL.
-
-            //throughput += lobe_throughput;
-                const float3 lobeOutgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(rec.outgoing));
+                const float G = smithG(rec.incident, rec.outgoing, H, rough);
+                const float3 lobeOutgoing = specular_dominant(H, rec.outgoing, dot(H, rec.incident), rough);
+                
+                const float3 lobeOutgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(lobeOutgoing));
+                
                 const float LOD = rough * IBLRange + IBLBias;
                 const float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, lobeOutgoingWS, LOD);
+                //throughput
+                lobe_throughput += eval_lobe(rec, lobes[i]);
+            
             
                 throughput += (lobe_throughput / lobe_pdf) * IBLSample;
             }
@@ -280,7 +304,7 @@ float4 main(VSOutput vsOutput) : SV_Target0
     
    
     float3 output = sample_preintegrated(rec, TangentToWorld, IORs, Kappas, Roughs);
-    
+    //float3 output = 0.0;
     
     
 	

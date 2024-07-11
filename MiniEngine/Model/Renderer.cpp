@@ -82,7 +82,15 @@ namespace Renderer
 void Renderer::Initialize(void)
 {
     ///TM2 PSOs
-    transfer_matrix.Initialise("FGD.dds", "tm_FGD.bin", "tm_GD.bin", "tm_TIR.bin");
+#if USEFP16 == 1
+    const std::wstring TIR_LUT = L"tm_TIR.dds";
+    const std::wstring FGD_LUT = L"tm_FGD.dds";
+#else
+    const std::wstring TIR_LUT = L"tm_TIR.bin";
+    const std::wstring FGD_LUT = L"tm_FGD.bin";
+#endif
+
+    transfer_matrix.Initialise("FGD.dds", FGD_LUT, L"tm_GD.bin", TIR_LUT);
 
 
     if (s_Initialized)

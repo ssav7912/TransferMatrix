@@ -398,7 +398,7 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
     
     components_transfer_factors_tm6(incident, props, ops);
     
-    
+    [loop]
     for (int c = 0; c < NumComponents; c++)
     {
         if (ops[c].type == TM_TYPE_NOCOMPONENT)
@@ -622,6 +622,8 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
                 const float3 H = float3(0., 0., 1.); //mirror reflection about normal, 
                     //as using preintegrated lighting.
                 rec.outgoing = reflectSpherical(rec.incident, H);
+                
+                const float3 lobe_outgoing = specular_dominant(H, rec.outgoing, dot(H, lobe_incident[1]), rough);
         
                 float G2 = smithG(rec.incident, rec.outgoing, H, props.rough[1]);
                 float D = D_GGX(H, props.rough[1]);
@@ -638,7 +640,7 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
                     F = fresnelConductorExact(dot(rec.incident, H), iors_01, props.kappas[1] / props.iors[0]);
                 }
             
-                const float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(rec.outgoing));
+                const float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(lobe_outgoing));
                 const float BottomRough = props.rough[1];
                 const float BottomLOD = BottomRough * IBLRange + IBLBias;
                 const float3 TopIBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, outgoingWS, BottomLOD);
@@ -648,7 +650,8 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
             if (i >= 1)
             {
                 lobe_throughput += eval_lobe(lobe_incident[i], rec.outgoing, lobes[i]);
-                const float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(rec.outgoing));
+                const float3 lobe_outgoing = specular_dominant(H, rec.outgoing, dot(H, lobe_incident[i]), rough);
+                const float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(lobe_outgoing));
 
                 const float LOD = rough * IBLRange + IBLBias;
                 const float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, outgoingWS, LOD);

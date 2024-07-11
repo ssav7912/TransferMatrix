@@ -9,13 +9,14 @@
 #include <filesystem>
 #include <fstream>
 
+
 class TransferMatrixResources
 {
 public:
 	TransferMatrixResources() = default;
-	TransferMatrixResources(const std::string & FGD_path, const std::string& FGD_4D_path, const std::string& GD_path, const std::string & TIR_path);
+	TransferMatrixResources(const std::string & FGD_path, const std::wstring& FGD_4D_path, const std::wstring& GD_path, const std::wstring & TIR_path);
 
-	void Initialise(const std::string& FGD_path, const std::string& FGD_4D_path, const std::string& GD_path, const std::string& TIR_path);
+	void Initialise(const std::string& FGD_path, const std::wstring& FGD_4D_path, const std::wstring& GD_path, const std::wstring& TIR_path);
 
 	bool UseTM6 = false;
 
@@ -32,14 +33,12 @@ public:
 	static constexpr int32_t MAX_LAYERS = 5;
 	
 
-private:
-
-	Texture3D LoadTIRLutFromFile(const std::string& TIR_path);
-	Texture3D LoadFGDLUTFromFile(const std::string& FGD_path);
-	Texture LoadGDLUTFromFile(const std::string& GD_path);
+	Texture3D LoadTIRLutFromFile(const std::wstring& TIR_path);
+	Texture3D LoadFGDLUTFromFile(const std::wstring& FGD_path);
+	Texture LoadGDLUTFromFile(const std::wstring& GD_path);
 
 	template<size_t LutDimension>
-	void LoadLUTFromFile(const std::string& path, std::vector<float>& data)
+	static void LoadLUTFromFile(const std::wstring& path, std::vector<float>& data)
 	{
 		struct range {
 			float min;
@@ -81,6 +80,7 @@ struct float3_padded
 {
 	float xyz[3];
 	float pad;
+
 };
 
 //float padded out to 16 bytes for HLSL cbuffer array alignment.

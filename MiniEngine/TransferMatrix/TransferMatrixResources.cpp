@@ -4,15 +4,18 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include "Texture3D.h"
+#include <codecvt>
+#include <locale>
 
-//TODO: fix this stupid shit
-#include "../Build/x64/Debug/Output/TransferMatrix/CompiledShaders/DefaultVS.h"
-#include "../Build/x64/Debug/Output/TransferMatrix/CompiledShaders/TM2DielectricPS.h"
-#include "../Build/x64/Debug/Output/TransferMatrix/CompiledShaders/TM2OpaquePS.h"
+#include "Texture3D.h"
+#include "DirectXTex.h"
+
+#include "DefaultVS.h"
+#include "TM2DielectricPS.h"
+#include "TM2OpaquePS.h"
 #include "TM6PS.h"
 
-TransferMatrixResources::TransferMatrixResources(const std::string & FGD_path, const std::string& FGD_4D_path, const std::string& GD_path, const std::string & TIR_path)
+TransferMatrixResources::TransferMatrixResources(const std::string & FGD_path, const std::wstring& FGD_4D_path, const std::wstring& GD_path, const std::wstring & TIR_path)
 {
 
 	//init PSO
@@ -20,7 +23,7 @@ TransferMatrixResources::TransferMatrixResources(const std::string & FGD_path, c
 
 }
 
-void TransferMatrixResources::Initialise(const std::string& FGD_path, const std::string& FGD_4D_path, const std::string& GD_path, const std::string& TIR_path)
+void TransferMatrixResources::Initialise(const std::string& FGD_path, const std::wstring& FGD_4D_path, const std::wstring& GD_path, const std::wstring& TIR_path)
 {
 
 	auto tex = TextureManager::LoadDDSFromFile(FGD_path);
@@ -54,8 +57,31 @@ void TransferMatrixResources::Initialise(const std::string& FGD_path, const std:
 /// </summary>
 /// <param name="TIR_path"></param>
 /// <returns></returns>
-Texture3D TransferMatrixResources::LoadTIRLutFromFile(const std::string& TIR_path)
+Texture3D TransferMatrixResources::LoadTIRLutFromFile(const std::wstring& TIR_path)
 {
+
+
+	Texture3D TIR{};
+	constexpr size_t Dim = 64;
+
+#if USEFP16 == 1
+	const DXGI_FORMAT pixel_format = DXGI_FORMAT_R16_FLOAT;
+	TexMetadata md;
+	
+	DirectX::ScratchImage out_image{};
+
+
+
+	HRESULT res = DirectX::LoadFromDDSFile(TIR_path.c_str(), DDS_FLAGS_NONE, &md, out_image);
+
+	ASSERT_SUCCEEDED(res);
+	
+	const void* data_ptr = out_image.GetPixels();
+	const size_t RowPitchBytes = Dim * sizeof(uint16_t); //half precision
+
+#else
+	const DXGI_FORMAT pixel_format = DXGI_FORMAT_R32_FLOAT;
+
 	struct range {
 		float min;
 		float max;
@@ -92,46 +118,42 @@ Texture3D TransferMatrixResources::LoadTIRLutFromFile(const std::string& TIR_pat
 
 
 
-	Texture3D TIR{};
-	constexpr size_t Dim = 64;
-
-
 	ASSERT(data.size() == Dim * Dim * Dim);
-	
+
+	const void* data_ptr = data.data();
+
+
 	const size_t RowPitchBytes = Dim * sizeof(float);
-	TIR.Create3D(RowPitchBytes, Dim, Dim, Dim, DXGI_FORMAT_R32_FLOAT, data.data());
+#endif
+
+	
+	TIR.Create3D(RowPitchBytes, Dim, Dim, Dim, pixel_format, data_ptr);
+
 	return TIR;
 }
 
-Texture3D TransferMatrixResources::LoadFGDLUTFromFile(const std::string& FGD_path)
+Texture3D TransferMatrixResources::LoadFGDLUTFromFile(const std::wstring& FGD_path)
 {
-	std::vector<float> data;
-	LoadLUTFromFile<4>(FGD_path, data);
 
 	Texture3D FGD{};
 	constexpr size_t Dim = 64;
 
-	//crush 4th dimension by dropping every 2nd value to fit into DX12 resource limits (HACK!!!!)
-	//for (int i = 0; i < Dim; i++)
-	//{
-	//	for (int j = 0; j < Dim; j++)
-	//	{
-	//		for (int k = 0; k < Dim; k++)
-	//		{
-	//			for (int l = 0; l < Dim; l++)
-	//			{
-	//				size_t linear_index = i * (Dim * Dim * Dim) + j * (Dim * Dim) + k * Dim + l;
+#if USEFP16 == 1
+	const DXGI_FORMAT pixel_format = DXGI_FORMAT_R16_FLOAT;
 
-	//				if (l % 2 == 0)
-	//				{
-	//					data.erase(data.begin() + linear_index);
-	//				}
+	DirectX::ScratchImage img{};
 
+	HRESULT res = LoadFromDDSFile(FGD_path.c_str(), DDS_FLAGS_NONE, nullptr, img);
 
-	//			}
-	//		}
-	//	}
-	//}
+	ASSERT_SUCCEEDED(res);
+
+	const void* data_ptr = img.GetPixels(); 
+	const size_t RowPitchBytes = Dim * sizeof(uint16_t); //half precision.
+#else
+
+	std::vector<float> data;
+	LoadLUTFromFile<4>(FGD_path, data);
+
 
 	//crushed vector
 	std::vector<float> new_data(Dim * Dim * Dim * (Dim / 2), std::nanf("NaN"));
@@ -172,16 +194,20 @@ Texture3D TransferMatrixResources::LoadFGDLUTFromFile(const std::string& FGD_pat
 	//4D texture
 	ASSERT(new_data.size() == Dim * Dim * Dim * (Dim/2));
 
+	const void* data_ptr = new_data.data();
+
 	//encode 4D LUT in 3D texture, Z dim encodes Z + W of index.
 	//i.e. dim = 64 * 64 * (64 * 64) = 64 * 64 * 4096. 
-	const size_t RowPitchbytes = Dim * sizeof(float);
+	const size_t RowPitchBytes = Dim * sizeof(float);
+#endif
 
-	FGD.Create3D(RowPitchbytes, Dim, Dim, Dim * (Dim/2), DXGI_FORMAT_R32_FLOAT, new_data.data());
+
+	FGD.Create3D(RowPitchBytes, Dim, Dim, Dim * (Dim/2), DXGI_FORMAT_R32_FLOAT, data_ptr);
 
 	return FGD;
 }
 
-Texture TransferMatrixResources::LoadGDLUTFromFile(const std::string& GD_path)
+Texture TransferMatrixResources::LoadGDLUTFromFile(const std::wstring& GD_path)
 {
 	constexpr size_t LUT_DIM = 64;
 	std::vector<float> data;

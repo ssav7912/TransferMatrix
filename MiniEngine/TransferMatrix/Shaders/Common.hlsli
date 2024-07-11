@@ -48,6 +48,7 @@ SamplerState cubeMapSampler : register(s12);
     #define ENABLE_TRIANGLE_ID 0
 #endif
 
+
 #if USEFP16
 typedef min16float real;
 typedef min16float2 real2; 
@@ -60,8 +61,6 @@ typedef float real;
 typedef float2 real2;
 typedef float3 real3;
 typedef float2x2 real2x2;
-
-
 #endif
 
 #if ENABLE_TRIANGLE_ID

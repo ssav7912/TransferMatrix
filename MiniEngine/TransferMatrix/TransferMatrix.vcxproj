@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -234,10 +234,12 @@
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="GLTFMaterialLayeringSpec.h" />
     <ClInclude Include="Texture3D.h" />
     <ClInclude Include="TransferMatrixResources.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="GLTFMaterialLayeringSpec.cpp" />
     <ClCompile Include="Texture3D.cpp" />
     <ClCompile Include="TransferMatrixResources.cpp">
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">HAS_DIRECTXTEX;%(PreprocessorDefinitions); </PreprocessorDefinitions>

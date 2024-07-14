@@ -1,3 +1,5 @@
+#define TM6
+
 #include "TransferMatrixCommon.hlsli"
 #include "tensor3d.hlsli"
 
@@ -11,16 +13,6 @@ static const uint TM_TRANSFER_FACTOR_SECONDARY_BACKWARD_REFLECTANCE = 0x04;
 
 static const int NumComponents = NumLayers * 2 - 1;
 
-struct LayerProperties
-{
-    float3 iors[LAYERS_MAX];
-    float3 kappas[LAYERS_MAX];
-    float rough[LAYERS_MAX];
-    float depths[LAYERS_MAX];
-    float3 sigma_s[LAYERS_MAX];
-    float3 sigma_k[LAYERS_MAX];
-    float gs[LAYERS_MAX];
-};
 
 struct layer_components_tm6
 {

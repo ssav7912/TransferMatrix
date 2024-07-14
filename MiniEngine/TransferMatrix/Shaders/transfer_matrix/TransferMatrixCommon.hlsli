@@ -30,33 +30,50 @@ struct sample_record
     bool sample_type;
 };
 
+
+struct LayerProperties
+{
+    float3 iors[LAYERS_MAX];
+    float3 kappas[LAYERS_MAX];
+    float rough[LAYERS_MAX];
+#ifdef TM6
+    float depths[LAYERS_MAX];
+    float3 sigma_s[LAYERS_MAX];
+    float3 sigma_k[LAYERS_MAX];
+    float gs[LAYERS_MAX];
+#endif
+    int NumLayers;
+};
+
 //Texture Arrays for textured impl.
-Texture2DArray<float3> IORs;
-Texture2DArray<float3> Kappas;
-Texture2DArray<float3> Sigma_S;
-Texture2DArray<float3> Sigma_K;
-Texture2DArray<float> Depths;
-Texture2DArray<float> Phase;
-Texture2DArray<float> Roughs;
+Texture2DArray<float3> TexIORs : register(t0);
+Texture2DArray<float3> TexKappas : register(t5);
+#ifdef TM6
+Texture2DArray<float3> TexSigma_S : register(t10);
+Texture2DArray<float3> TexSigma_K : register(t15);
+Texture2DArray<float> TexDepths : register(t20);
+Texture2DArray<float> TexPhase : register (t25);
+#endif
+Texture2DArray<float> TexRoughs : register(t30);
 
 
 //Lookup table for Total Internal Reflection
-Texture3D<real> TIR_LUT : register(t18);
+Texture3D<real> TIR_LUT : register(t48);
 
 //compile time switch for (Karis 2013). split sum FGD approx, or the (Belcour 2018). FGD LUT.
 #if USE_FAST_FGD == 1
 //LUT for Karis Split-sum FGD approximation.
 Texture2D<float2> FGD_LUT : register(t19);
 #else
-Texture3D<float> FGD_LUT : register(t20);
+Texture3D<float> FGD_LUT : register(t50);
 #endif
 
-Texture2D<float> GD_LUT : register(t21);
+Texture2D<float> GD_LUT : register(t51);
 
 
 //IBL
-TextureCube<float3> radianceIBLTexutre : register(t10);
-TextureCube<float3> irradianceIBLTexture : register(t10);
+TextureCube<float3> radianceIBLTexutre : register(t35);
+TextureCube<float3> irradianceIBLTexture : register(t35);
 
 sampler LUTSampler : register(s13);
 
@@ -104,6 +121,32 @@ struct VSOutput
     float3 worldPos : TEXCOORD2;
     float3 sunShadowCoord : TEXCOORD3;
 };
+
+
+//populates the layer properties structure for the sampled UV coordinate using either 
+//the texture arrays or the uniform buffer, depending on the provided layermask.
+//if the bit in the i'th digit of layermask is set, this means sample from the relevant texturearray.
+LayerProperties sample_layer_textures(float2 uv, uint layermask)
+{
+    LayerProperties x;
+    for (int i = 0; i < NumLayers; i++)
+    {
+        x.iors[i] = (1 << i) & layermask ? TexIORs.Sample(defaultSampler, float3(uv, i)) : IORs[i];
+        x.kappas[i] = (1 << i) & layermask ? TexKappas.Sample(defaultSampler, float3(uv, i)) : Kappas[i];
+#ifdef TM6
+        x.sigma_s[i] = (1 << i) & layermask ? TexSigma_S.Sample(defaultSampler, float3(uv, i)) : Sigma_S[i];
+        x.sigma_k[i] = (1 << i) & layermask ? TexSigma_K.Sample(defaultSampler, float3(uv, i)) : Sigma_K[i];
+        x.depths[i] = (1 << i) & layermask ? TexDepths.Sample(defaultSampler, float3(uv, i)) : Depths[i];
+        x.gs[i] = (1 << i) & layermask ? TexPhase.Sample(defaultSampler, float3(uv, i)) : G[i];
+#endif        
+        x.rough[i] = (1 << i) & layermask ? TexRoughs.Sample(defaultSampler, float3(uv, i)) : Roughs[i];
+
+    }
+    
+    x.NumLayers = NumLayers;
+    return x;
+
+}
 
 
 min16float hg_lh_norm(min16float g)

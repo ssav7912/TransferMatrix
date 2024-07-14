@@ -149,7 +149,7 @@ float3 eval_lobe(const sample_record rec, const henyey_greenstein lobe)
     return throughput;
 }
 
-float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, float3 iors[LAYERS_MAX], float3 kappas[LAYERS_MAX], float roughs[LAYERS_MAX])
+float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, LayerProperties props)
 {
     if (rec.incident.z < 0)
     {
@@ -165,7 +165,7 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, fl
     
     //get the outgoing lobes
     henyey_greenstein lobes[LAYERS_MAX];
-    outgoing_lobes(rec.incident, iors, kappas, roughs, lobes);
+    outgoing_lobes(rec.incident, props.iors, props.kappas, props.rough, lobes);
     
         //shift the outgoing lobe direction to correct for lobe mean.
         
@@ -228,7 +228,7 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, fl
             if (i == 0)
             {
                 //top reflection correction. [Bati 2019]
-                const float BottomRough = roughs[1];
+                const float BottomRough = props.rough[1];
                 float G = smithG(rec.incident, rec.outgoing, H, BottomRough);
                 const float3 TopLobeOutgoing = specular_dominant(H, rec.outgoing, dot(H, rec.incident), BottomRough);
                 
@@ -236,17 +236,17 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, fl
                 const float BottomLOD = BottomRough * IBLRange + IBLBias;
                 const float3 TopIBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, topOutgoingWS, BottomLOD);
 
-                const real G2_0 = smithG(rec.incident, rec.outgoing, H, roughs[1]);
-                const real D0_0 = D_GGX(H, roughs[1]);
+                const real G2_0 = smithG(rec.incident, rec.outgoing, H, BottomRough);
+                const real D0_0 = D_GGX(H, BottomRough);
                 real3 F0 = 0.0.xxx;
-                const real3 ior_01 = iors[1] / iors[0];
-                if (isZero(kappas[1]))
+                const real3 ior_01 = props.iors[1] / props.iors[0];
+                if (isZero(props.kappas[1]))
                 {
                     F0 = fresnelDielectric(dot(rec.incident, H), float3_average(ior_01));
                 }
                 else
                 {
-                    F0 = fresnelConductorExact(dot(rec.incident, H), ior_01, kappas[1] / iors[0]);
+                    F0 = fresnelConductorExact(dot(rec.incident, H), ior_01, props.kappas[1] / props.iors[0]);
                 }
 
                 throughput += ((F0 * G2_0 * D0_0 / (4.0f * rec.incident.z)) / lobe_pdf) * TopIBLSample;
@@ -302,8 +302,9 @@ float4 main(VSOutput vsOutput) : SV_Target0
     };
     
     
+    LayerProperties props = sample_layer_textures(vsOutput.uv0, 0);
    
-    float3 output = sample_preintegrated(rec, TangentToWorld, IORs, Kappas, Roughs);
+    float3 output = sample_preintegrated(rec, TangentToWorld, props);
     //float3 output = 0.0;
     
     

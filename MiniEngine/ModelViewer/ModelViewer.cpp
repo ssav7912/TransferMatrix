@@ -366,7 +366,13 @@ void ModelViewer::RenderScene( void )
         
         constexpr float epsilon = std::numeric_limits<float>::epsilon(); 
 
-        for (size_t i = 0; i < gui.NumLayers; i++)
+
+        //substrate must be last layer in the stack, that is:
+        //index 0 is air
+        //index 1 is top-layer
+        // ...
+        //index n is substrate
+        for (int32_t i = gui.NumLayers; i >= 0; i--)
         {
             layers.IORs[i + 1].xyz[0] = std::max(epsilon, gui.IOR_DEFAULT[i][0]);
             layers.IORs[i + 1].xyz[1] = std::max(epsilon, gui.IOR_DEFAULT[i][1]);

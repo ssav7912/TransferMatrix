@@ -424,7 +424,7 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
             
             
             //simplification? drop TIR correction?
-            if (ior_ij < 1.0f)
+            if (ior_ij < 1.0)
             {
                 TIR_norm = TIR_lookup(float3(abs(ops[c].interface_type.reflection_down.mean.z), hg_to_ggx(asymmetry_T_0i), ior_ij)) * ops[c].interface_type.transmission_down.norm;
                 
@@ -500,7 +500,7 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
         {
             energy_reflect_i = energy_reflect_f_0i - energy_reflect_f_0h;
             
-            lobes[count].norm = max(energy_reflect_i, 0.0);
+            lobes[count].norm = max(energy_reflect_i, 0.0.xxx);
             lobes[count].asymmetry = float3_average(safe_div((asymmetry_reflect_f_0i - asymmetry_reflect_f_0h), energy_reflect_i));
             lobe_incident[count++] = incident;
         }
@@ -573,7 +573,7 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
     
     
     const float3 H = float3(0., 0., 1.0);
-    for (int i = 0; i < lobe_count; i++)
+    for (int i = 0; i < lobe_count + 1; i++)
     {
         if (!isZero(lobes[i].norm))
         {

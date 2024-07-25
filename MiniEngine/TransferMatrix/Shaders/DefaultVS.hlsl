@@ -76,7 +76,6 @@ struct VSOutput
     float3 sunShadowCoord : TEXCOORD3;
 };
 
-[RootSignature(Renderer_RootSig)]
 VSOutput main(VSInput vsInput)
 {
     VSOutput vsOutput;

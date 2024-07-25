@@ -45,6 +45,25 @@ struct LayerProperties
     int NumLayers;
 };
 
+LayerProperties zero_initialise_layers()
+{
+    LayerProperties x;
+    for (int i = 0; i < LAYERS_MAX; i++)
+    {
+        x.iors[i] = 0.0.xxx;
+        x.kappas[i] = 0.0.xxx;
+#ifdef TM6
+         x.sigma_s[i] = 0.0.xxx;
+        x.sigma_k[i] = 0.0.xxx;
+        x.depths[i] = 0.0;
+        x.gs[i] = 0.0;
+#endif
+        x.rough[i] = 0.0;
+    }
+    return x;
+
+}
+
 //Texture Arrays for textured impl.
 Texture2DArray<float3> TexIORs : register(t0);
 Texture2DArray<float3> TexKappas : register(t5);
@@ -58,17 +77,17 @@ Texture2DArray<float> TexRoughs : register(t30);
 
 
 //Lookup table for Total Internal Reflection
-Texture3D<real> TIR_LUT : register(t48);
+Texture3D<real> TIR_LUT : register(t43);
 
 //compile time switch for (Karis 2013). split sum FGD approx, or the (Belcour 2018). FGD LUT.
 #if USE_FAST_FGD == 1
 //LUT for Karis Split-sum FGD approximation.
-Texture2D<float2> FGD_LUT : register(t19);
+Texture2D<float2> FGD_LUT : register(t44);
 #else
-Texture3D<float> FGD_LUT : register(t50);
+Texture3D<float> FGD_LUT : register(t45);
 #endif
 
-Texture2D<float> GD_LUT : register(t51);
+Texture2D<float> GD_LUT : register(t46);
 
 
 //IBL
@@ -128,8 +147,8 @@ struct VSOutput
 //if the bit in the i'th digit of layermask is set, this means sample from the relevant texturearray.
 LayerProperties sample_layer_textures(float2 uv, uint layermask)
 {
-    LayerProperties x;
-    for (int i = 0; i < NumLayers; i++)
+    LayerProperties x = zero_initialise_layers();
+    for (int i = 0; i < NumLayers + 1; i++)
     {
         x.iors[i] = (1 << i) & layermask ? TexIORs.Sample(defaultSampler, float3(uv, i)) : IORs[i];
         x.kappas[i] = (1 << i) & layermask ? TexKappas.Sample(defaultSampler, float3(uv, i)) : Kappas[i];
@@ -790,7 +809,7 @@ real3 sample_FGD(float cti, real alpha, real3 ior, real3 kappa)
     
     //remap Z & W index from being within [0,64] range to [0,2048]
     //Z index is normalised [0,64] range stretched to [0,2048]
-    const float3 ior_index = saturate((ior - DimensionZMin) / (DimensionZMax - DimensionZMin));
+    const float3 ior_index = saturate((ior - DimensionZMin) / (DimensionZMax - DimensionZMin)) / DimensionZ;
     //W index is normalised [0,64] range + Z index.
     const float3 kappa_index = saturate((kappa - DimensionWMin) / (DimensionWMax - DimensionWMin));
    

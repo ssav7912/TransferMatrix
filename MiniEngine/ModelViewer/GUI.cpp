@@ -54,8 +54,8 @@ void GUI::LayerUI(int32_t num_layers, int32_t max_layers)
 		{
 			ImGui::DragFloat3(std::format("Sigma S Layer {0}", i).c_str(), SIGMA_S_DEFAULT[i], 0.1, 0.0f);
 			ImGui::DragFloat3(std::format("Sigma K Layer {0}", i).c_str(), SIGMA_K_DEFAULT[i], 0.1, 0.0f);
-			ImGui::SliderFloat(std::format("Depth Layer {0}", i).c_str(), &DEPTH_DEFAULT[i], 0.0f, 1.0f);
-			ImGui::SliderFloat(std::format("Phase Media {0}", i).c_str(), &G_DEFAULT[i], 0.1, 1.0f);
+			ImGui::DragFloat(std::format("Depth Layer {0}", i).c_str(), &DEPTH_DEFAULT[i], 0.1, 0.0);
+			ImGui::SliderFloat(std::format("Phase Media {0}", i).c_str(), &G_DEFAULT[i], 0.0f, 1.0f);
 		}
 
 		//IORs[i] = Math::Vector3(IOR_DEFAULT[i][0], IOR_DEFAULT[i][1], IOR_DEFAULT[i][2]);

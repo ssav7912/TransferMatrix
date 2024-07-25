@@ -69,28 +69,40 @@ void LoadMaterials(Model& model,
     {
         const MaterialTextureData& srcMat = materialTextures[matIdx];
 
-        DescriptorHandle TextureHandles = Renderer::s_TextureHeap.Alloc(kNumTextures);
+
+        //Override bindings to allocate full TransferMatrix Texture range. (Big!!)
+        DescriptorHandle TextureHandles = Renderer::s_TextureHeap.Alloc(TransferMatrixResources::MAX_TEXTURES);
         uint32_t SRVDescriptorTable = Renderer::s_TextureHeap.GetOffsetOfHandle(TextureHandles);
 
-        uint32_t DestCount = kNumTextures;
-        uint32_t SourceCounts[kNumTextures] = { 1, 1, 1, 1, 1 };
+        uint32_t DestCount = TransferMatrixResources::MAX_TEXTURES;
+        uint32_t SourceCounts[TransferMatrixResources::MAX_TEXTURES];
 
-        D3D12_CPU_DESCRIPTOR_HANDLE DefaultTextures[kNumTextures] =
-        {
-            GetDefaultTexture(kWhiteOpaque2D),
-            GetDefaultTexture(kWhiteOpaque2D),
-            GetDefaultTexture(kWhiteOpaque2D),
-            GetDefaultTexture(kBlackTransparent2D),
-            GetDefaultTexture(kDefaultNormalMap)
-        };
 
-        D3D12_CPU_DESCRIPTOR_HANDLE SourceTextures[kNumTextures];
-        for (uint32_t j = 0; j < kNumTextures; ++j)
+
+        D3D12_CPU_DESCRIPTOR_HANDLE DefaultTextures[TransferMatrixResources::MAX_TEXTURES];
+        for (uint32_t i = 0; i < TransferMatrixResources::MAX_TEXTURES; i++)
         {
-            if (srcMat.stringIdx[j] == 0xffff)
+            SourceCounts[i] = 1;
+            DefaultTextures[i] = GetDefaultTexture(kWhiteOpaque2D);
+        }
+
+
+        D3D12_CPU_DESCRIPTOR_HANDLE SourceTextures[TransferMatrixResources::MAX_TEXTURES];
+        for (uint32_t j = 0; j < TransferMatrixResources::MAX_TEXTURES; ++j)
+        {
+            if (j >= kNumTextures)
+            {
                 SourceTextures[j] = DefaultTextures[j];
+            }
+
+            else if (srcMat.stringIdx[j] == 0xffff)
+            {
+                SourceTextures[j] = DefaultTextures[j];
+            }
             else
+            {
                 SourceTextures[j] = model.textures[srcMat.stringIdx[j]].GetSRV();
+            }
         }
 
         g_Device->CopyDescriptors(1, &TextureHandles, &DestCount,
@@ -103,6 +115,7 @@ void LoadMaterials(Model& model,
 
         if (samplerMapLookup == g_SamplerPermutations.end())
         {
+            uint32_t SamplerDestCount = kNumTextures;
             DescriptorHandle SamplerHandles = Renderer::s_SamplerHeap.Alloc(kNumTextures);
             uint32_t SamplerDescriptorTable = Renderer::s_SamplerHeap.GetOffsetOfHandle(SamplerHandles);
             g_SamplerPermutations[addressModes] = SamplerDescriptorTable;
@@ -114,8 +127,8 @@ void LoadMaterials(Model& model,
                 SourceSamplers[j] = GetSampler(addressModes & 0xF);
                 addressModes >>= 4;
             }
-            g_Device->CopyDescriptors(1, &SamplerHandles, &DestCount,
-                DestCount, SourceSamplers, SourceCounts, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
+            g_Device->CopyDescriptors(1, &SamplerHandles, &SamplerDestCount,
+                SamplerDestCount, SourceSamplers, SourceCounts, D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
         }
         else
         {

@@ -103,7 +103,7 @@ void dielectric_transfer_factors(float3 incident, real ior, real alpha, out laye
 
 }
 
-void conductor_transfer_factors(float3 incident, float3 ior, float3 kappa, float rough, out layer_components_tm2 ops)
+void conductor_transfer_factors(float3 incident, real3 ior, real3 kappa, real rough, out layer_components_tm2 ops)
 {
     ops.component_type = TM_TYPE_CONDUCTORINTERFACE;
     

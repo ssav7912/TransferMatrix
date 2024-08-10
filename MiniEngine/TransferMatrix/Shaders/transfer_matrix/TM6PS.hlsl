@@ -685,14 +685,7 @@ float4 main(VSOutput vsOutput) : SV_Target0
     
     
     
-    LayerProperties props;
-    props.iors = IORs;
-    props.kappas = Kappas;
-    props.depths = Depths;
-    props.gs = G;
-    props.rough = Roughs;
-    props.sigma_k = Sigma_K;
-    props.sigma_s = Sigma_S;
+    LayerProperties props = truncate_layer_parameters();
         
         
             

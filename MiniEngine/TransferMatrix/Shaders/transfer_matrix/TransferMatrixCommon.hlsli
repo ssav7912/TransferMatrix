@@ -33,14 +33,14 @@ struct sample_record
 
 struct LayerProperties
 {
-    float3 iors[LAYERS_MAX];
-    float3 kappas[LAYERS_MAX];
-    float rough[LAYERS_MAX];
+    real3 iors[LAYERS_MAX];
+    real3 kappas[LAYERS_MAX];
+    real rough[LAYERS_MAX];
 #ifdef TM6
-    float depths[LAYERS_MAX];
-    float3 sigma_s[LAYERS_MAX];
-    float3 sigma_k[LAYERS_MAX];
-    float gs[LAYERS_MAX];
+    real depths[LAYERS_MAX];
+    real3 sigma_s[LAYERS_MAX];
+    real3 sigma_k[LAYERS_MAX];
+    real gs[LAYERS_MAX];
 #endif
     int NumLayers;
 };
@@ -148,7 +148,7 @@ struct VSOutput
 LayerProperties sample_layer_textures(float2 uv, uint layermask)
 {
     LayerProperties x = zero_initialise_layers();
-    for (int i = 0; i < NumLayers + 1; i++)
+    for (int i = 0; i <= NumLayers + 1; i++) //indexing starts at 1,
     {
         x.iors[i] = (1 << i) & layermask ? TexIORs.Sample(defaultSampler, float3(uv, i)) : IORs[i];
         x.kappas[i] = (1 << i) & layermask ? TexKappas.Sample(defaultSampler, float3(uv, i)) : Kappas[i];
@@ -165,6 +165,31 @@ LayerProperties sample_layer_textures(float2 uv, uint layermask)
     x.NumLayers = NumLayers;
     return x;
 
+}
+
+
+//helper function to truncate full precision constant buffer to
+//half precision layerprops struct, workaround for type mismatch.
+LayerProperties truncate_layer_parameters()
+{
+    LayerProperties props;
+    
+    [unroll]
+    for (int i = 0; i < LAYERS_MAX; i++)
+    {
+        props.iors[i] = IORs[i];
+        props.kappas[i] = Kappas[i];
+#ifdef TM6
+        props.sigma_s[i] = Sigma_S[i];
+        props.sigma_k[i] = Sigma_K[i];
+        props.gs[i] = G[i];
+        props.depths[i] = Depths[i];
+#endif
+        
+        props.rough[i] = Roughs[i];
+    }
+
+    return props;
 }
 
 

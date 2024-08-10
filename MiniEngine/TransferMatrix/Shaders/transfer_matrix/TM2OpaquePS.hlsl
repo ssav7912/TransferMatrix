@@ -2,10 +2,11 @@
 #include "MatrixOperators.hlsli"
 
 
-void components_transfer_factors(float3 incident, float3 iors[LAYERS_MAX], float3 kappas[LAYERS_MAX], float roughness[LAYERS_MAX], out layer_components_tm2 ops[LAYERS_MAX])
+void components_transfer_factors(float3 incident, real3 iors[LAYERS_MAX], real3 kappas[LAYERS_MAX], real roughness[LAYERS_MAX], out layer_components_tm2 ops[LAYERS_MAX])
 {
     real3 ior_ij = 0.0;
     
+    [loop]
     for (int i = 0; i < NumLayers; i++)
     {
         ops[i] = zero_init_tm2_components();
@@ -24,7 +25,7 @@ void components_transfer_factors(float3 incident, float3 iors[LAYERS_MAX], float
 
 }
 
-void outgoing_lobes(float3 incident, float3 ior[LAYERS_MAX], float3 kappas[LAYERS_MAX], float roughness[LAYERS_MAX], out henyey_greenstein lobes[LAYERS_MAX])
+void outgoing_lobes(float3 incident, real3 ior[LAYERS_MAX], real3 kappas[LAYERS_MAX], real roughness[LAYERS_MAX], out hg_nomean lobes[LAYERS_MAX])
 {
     layer_components_tm2 ops[LAYERS_MAX]; 
     
@@ -60,6 +61,7 @@ void outgoing_lobes(float3 incident, float3 ior[LAYERS_MAX], float3 kappas[LAYER
     
     components_transfer_factors(incident, ior, kappas, roughness, ops);
     
+    [loop]
     for (int i = 0; i < NumLayers; i++)
     {
         //goddamn numerical robustness
@@ -78,7 +80,7 @@ void outgoing_lobes(float3 incident, float3 ior[LAYERS_MAX], float3 kappas[LAYER
             
             ops[i].transmission_up.asymmetry = asymmetry_T_0j_R != 0.0 ? asymmetry_T_0j_RT / asymmetry_T_0j_R : 0.0;
         
-            //toggle to disable the TIR correction. Breaks conservation but seems to massively improrve performance.
+            //toggle to disable the TIR correction. Breaks conservation but seems to massively improve performance.
 #if !defined(DISABLE_TIR) || DISABLE_TIR == 0
             if (ior_ij < 1.0)
             {
@@ -199,8 +201,8 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
             
         
             float3 lobe_throughput = 0.0f;
-            float lobe_weight = float3_average(lobes[i].norm);
-            const float rough = hg_to_ggx(lobes[i].asymmetry);
+            real lobe_weight = float3_average(lobes[i].norm);
+            const real rough = hg_to_ggx(lobes[i].asymmetry);
            
      
             rec.ior = 1.0f;
@@ -209,7 +211,7 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
         
         
         //pdf
-            float lobe_pdf = 0.0f;
+            float lobe_pdf = 0.0;
             {
             
                 float3 incoming = rec.incident;
@@ -228,16 +230,16 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
             if (i == 0)
             {
                 //top reflection correction. [Bati 2019]
-                const float BottomRough = props.rough[1];
-                float G = smithG(rec.incident, rec.outgoing, H, BottomRough);
-                const float3 TopLobeOutgoing = specular_dominant(H, rec.outgoing, dot(H, rec.incident), BottomRough);
+                const real TopRough = props.rough[1];
+                float G = smithG(rec.incident, rec.outgoing, H, TopRough);
+                const float3 TopLobeOutgoing = specular_dominant(H, rec.outgoing, dot(H, rec.incident), TopRough);
                 
                 const float3 topOutgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(TopLobeOutgoing));
-                const float BottomLOD = BottomRough * IBLRange + IBLBias;
+                const float BottomLOD = TopRough * IBLRange + IBLBias;
                 const float3 TopIBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, topOutgoingWS, BottomLOD);
 
-                const real G2_0 = smithG(rec.incident, rec.outgoing, H, BottomRough);
-                const real D0_0 = D_GGX(H, BottomRough);
+                const real G2_0 = smithG(rec.incident, rec.outgoing, H, TopRough);
+                const real D0_0 = D_GGX(H, TopRough);
                 real3 F0 = 0.0.xxx;
                 const real3 ior_01 = props.iors[1] / props.iors[0];
                 if (isZero(props.kappas[1]))

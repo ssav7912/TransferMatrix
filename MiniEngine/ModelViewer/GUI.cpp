@@ -36,11 +36,11 @@ void GUI::Teardown()
 
 void GUI::LayerUI(int32_t num_layers, int32_t max_layers)
 {
-	num_layers = std::max(0,std::min(num_layers, max_layers));
+	num_layers = std::max(1,std::min(num_layers, max_layers));
 
 	ImGui::SetNextWindowSize({ 600, 768 });
 	ImGui::Begin("Layers");
-	for (int32_t i = num_layers - 1u; i >= 0; --i)
+	for (int32_t i = num_layers - 1; i >= 0; --i)
 	{
 		ImGui::Text(std::format("Layer {0} Params", i).c_str());
 
@@ -70,8 +70,8 @@ void GUI::LayerUI(int32_t num_layers, int32_t max_layers)
 
 	}
 
-	ImGui::DragInt("Number of Layers", &NumLayers, 1, 5);
-	NumLayers = std::max(0, std::min(NumLayers, max_layers));
+	ImGui::DragInt("Number of Layers", &NumLayers, 1, max_layers);
+	NumLayers = std::max(1, std::min(NumLayers, max_layers));
 	ImGui::DragInt("BSDF Samples", &NumSamples, 1.0f, 1, 100);
 
 	ImGui::Checkbox("Use 6-flux Matrix", &UseTM6);

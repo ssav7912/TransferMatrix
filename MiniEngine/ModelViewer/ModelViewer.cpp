@@ -372,28 +372,29 @@ void ModelViewer::RenderScene( void )
         //index 1 is top-layer
         // ...
         //index n is substrate
-        for (int32_t i = gui.NumLayers; i >= 0; i--)
+        for (int32_t i = gui.NumLayers; i >= 1; i--)
         {
-            layers.IORs[i + 1].xyz[0] = std::max(epsilon, gui.IOR_DEFAULT[i][0]);
-            layers.IORs[i + 1].xyz[1] = std::max(epsilon, gui.IOR_DEFAULT[i][1]);
-            layers.IORs[i + 1].xyz[2] = std::max(epsilon, gui.IOR_DEFAULT[i][2]);
+
+            layers.IORs[i].xyz[0] = std::max(epsilon, gui.IOR_DEFAULT[i - 1][0]);
+            layers.IORs[i].xyz[1] = std::max(epsilon, gui.IOR_DEFAULT[i - 1][1]);
+            layers.IORs[i].xyz[2] = std::max(epsilon, gui.IOR_DEFAULT[i - 1][2]);
 
 
-            layers.Kappas[i + 1].xyz[0] = std::max(0.f,gui.KAPPA_DEFAULT[i][0]);
-            layers.Kappas[i + 1].xyz[1] = std::max(0.f,gui.KAPPA_DEFAULT[i][1]);
-            layers.Kappas[i + 1].xyz[2] = std::max(0.f,gui.KAPPA_DEFAULT[i][2]);
+            layers.Kappas[i].xyz[0] = std::max(0.f,gui.KAPPA_DEFAULT[i - 1][0]);
+            layers.Kappas[i].xyz[1] = std::max(0.f,gui.KAPPA_DEFAULT[i - 1][1]);
+            layers.Kappas[i].xyz[2] = std::max(0.f,gui.KAPPA_DEFAULT[i - 1][2]);
 
-            layers.Sigma_S[i + 1].xyz[0] = gui.SIGMA_S_DEFAULT[i][0];
-            layers.Sigma_S[i + 1].xyz[1] = gui.SIGMA_S_DEFAULT[i][1];
-            layers.Sigma_S[i + 1].xyz[2] = gui.SIGMA_S_DEFAULT[i][2];
+            layers.Sigma_S[i].xyz[0] = gui.SIGMA_S_DEFAULT[i - 1][0];
+            layers.Sigma_S[i].xyz[1] = gui.SIGMA_S_DEFAULT[i - 1][1];
+            layers.Sigma_S[i].xyz[2] = gui.SIGMA_S_DEFAULT[i - 1][2];
            
-            layers.Sigma_K[i + 1].xyz[0] = gui.SIGMA_K_DEFAULT[i][0];
-            layers.Sigma_K[i + 1].xyz[1] = gui.SIGMA_K_DEFAULT[i][1];
-            layers.Sigma_K[i + 1].xyz[2] = gui.SIGMA_K_DEFAULT[i][2];
+            layers.Sigma_K[i].xyz[0] = gui.SIGMA_K_DEFAULT[i - 1][0];
+            layers.Sigma_K[i].xyz[1] = gui.SIGMA_K_DEFAULT[i - 1][1];
+            layers.Sigma_K[i].xyz[2] = gui.SIGMA_K_DEFAULT[i - 1][2];
 
-            layers.Depths[i + 1].x = gui.DEPTH_DEFAULT[i];
-            layers.G[i + 1].x = gui.G_DEFAULT[i];
-            layers.Roughs[i + 1].x = gui.ROUGH_DEFAULT[i];
+            layers.Depths[i].x = gui.DEPTH_DEFAULT[i - 1];
+            layers.G[i].x = gui.G_DEFAULT[i - 1];
+            layers.Roughs[i].x = gui.ROUGH_DEFAULT[i - 1];
         }
 
 
@@ -475,7 +476,7 @@ void ModelViewer::RenderScene( void )
         MotionBlur::RenderObjectBlur(gfxContext, g_VelocityBuffer);
 
 
-    gui.LayerUI(std::max(0,std::min(TransferMatrixResources::MAX_LAYERS-1, gui.NumLayers)), TransferMatrixResources::MAX_LAYERS - 1); //-1 to account for the external media.
+    gui.LayerUI(std::max(0,std::min(TransferMatrixResources::MAX_LAYERS -1, gui.NumLayers)), TransferMatrixResources::MAX_LAYERS - 1); //-1 to account for the external media.
 
 
     ImGui::Render();

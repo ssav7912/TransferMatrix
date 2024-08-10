@@ -150,7 +150,7 @@ Texture3D TransferMatrixResources::LoadFGDLUTFromFile(const std::wstring& FGD_pa
 	const void* data_ptr = img.GetPixels(); 
 	const size_t RowPitchBytes = Dim * sizeof(uint16_t); //half precision.
 #else
-
+	const DXGI_FORMAT pixel_format = DXGI_FORMAT_R32_FLOAT;
 	std::vector<float> data;
 	LoadLUTFromFile<4>(FGD_path, data);
 
@@ -202,7 +202,7 @@ Texture3D TransferMatrixResources::LoadFGDLUTFromFile(const std::wstring& FGD_pa
 #endif
 
 
-	FGD.Create3D(RowPitchBytes, Dim, Dim, Dim * (Dim/2), DXGI_FORMAT_R32_FLOAT, data_ptr);
+	FGD.Create3D(RowPitchBytes, Dim, Dim, Dim * (Dim/2), pixel_format, data_ptr);
 
 	return FGD;
 }

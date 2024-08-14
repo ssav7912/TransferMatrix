@@ -32,7 +32,7 @@ public:
 	static constexpr int32_t NUM_LAYERS = 2;
 	static constexpr int32_t MAX_LAYERS = 5;
 	static constexpr int32_t NUM_ATTRIBUTES = 7;
-	static constexpr int32_t MAX_TEXTURES = MAX_LAYERS * NUM_ATTRIBUTES;
+	static constexpr int32_t MAX_TEXTURES = 5 * NUM_ATTRIBUTES;
 
 	
 

@@ -66,7 +66,7 @@ void outgoing_lobes(float3 incident, real3 ior[LAYERS_MAX], real3 kappas[LAYERS_
     {
         //goddamn numerical robustness
         //wonder what the cost of throwing safe_divs everywhere is...
-        lobes[i] = zero_hg();
+        lobes[i] = zero_hg_nomean();
         if (ops[i].component_type == TM_TYPE_DIELECTRICINTERFACE)
         {
             ior_ij = float3_average((ior[i + 1] / ior[i]));
@@ -119,7 +119,7 @@ void outgoing_lobes(float3 incident, real3 ior[LAYERS_MAX], real3 kappas[LAYERS_
         
         lobes[i].norm = energy_r_i;
         lobes[i].asymmetry = energy_r_i_average > 0.0f ? min((asymmetry_r_0i - asymmetry_r_0h) / energy_r_i_average, 1.0) : 0.0;
-        lobes[i].mean = ops[i].reflection_up.mean; //maybe totally wrong?
+        //lobes[i].mean = ops[i].reflection_up.mean; //maybe totally wrong?
         
         energy_r_0h = energy_r_0i;
         asymmetry_r_0h = asymmetry_r_0i;
@@ -129,7 +129,7 @@ void outgoing_lobes(float3 incident, real3 ior[LAYERS_MAX], real3 kappas[LAYERS_
 
 }
 
-float3 eval_lobe(const sample_record rec, const henyey_greenstein lobe)
+float3 eval_lobe(const sample_record rec, const hg_nomean lobe)
 {
     
     const float3 H = normalize(rec.incident + rec.outgoing);
@@ -166,7 +166,7 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
     
     
     //get the outgoing lobes
-    henyey_greenstein lobes[LAYERS_MAX];
+    hg_nomean lobes[LAYERS_MAX];
     outgoing_lobes(rec.incident, props.iors, props.kappas, props.rough, lobes);
     
         //shift the outgoing lobe direction to correct for lobe mean.
@@ -304,7 +304,7 @@ float4 main(VSOutput vsOutput) : SV_Target0
     };
     
     
-    LayerProperties props = sample_layer_textures(vsOutput.uv0, 0);
+    LayerProperties props = truncate_layer_parameters();
    
     float3 output = sample_preintegrated(rec, TangentToWorld, props);
     //float3 output = 0.0;

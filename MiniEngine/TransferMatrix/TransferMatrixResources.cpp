@@ -11,7 +11,7 @@
 #include "DirectXTex.h"
 
 #include "DefaultVS.h"
-#include "TM2DielectricPS.h"
+//#include "TM2DielectricPS.h"
 #include "TM2OpaquePS.h"
 #include "TM6PS.h"
 

@@ -65,15 +65,15 @@ LayerProperties zero_initialise_layers()
 }
 
 //Texture Arrays for textured impl.
-Texture2DArray<float3> TexIORs : register(t0);
-Texture2DArray<float3> TexKappas : register(t5);
-#ifdef TM6
-Texture2DArray<float3> TexSigma_S : register(t10);
-Texture2DArray<float3> TexSigma_K : register(t15);
-Texture2DArray<float> TexDepths : register(t20);
-Texture2DArray<float> TexPhase : register (t25);
-#endif
-Texture2DArray<float> TexRoughs : register(t30);
+//Texture2DArray<float3> TexIORs : register(t0);
+//Texture2DArray<float3> TexKappas : register(t5);
+//#ifdef TM6
+//Texture2DArray<float3> TexSigma_S : register(t10);
+//Texture2DArray<float3> TexSigma_K : register(t15);
+//Texture2DArray<float> TexDepths : register(t20);
+//Texture2DArray<float> TexPhase : register (t25);
+//#endif
+//Texture2DArray<float> TexRoughs : register(t30);
 
 
 //Lookup table for Total Internal Reflection
@@ -145,27 +145,27 @@ struct VSOutput
 //populates the layer properties structure for the sampled UV coordinate using either 
 //the texture arrays or the uniform buffer, depending on the provided layermask.
 //if the bit in the i'th digit of layermask is set, this means sample from the relevant texturearray.
-LayerProperties sample_layer_textures(float2 uv, uint layermask)
-{
-    LayerProperties x = zero_initialise_layers();
-    for (int i = 0; i <= NumLayers + 1; i++) //indexing starts at 1,
-    {
-        x.iors[i] = (1 << i) & layermask ? TexIORs.Sample(defaultSampler, float3(uv, i)) : IORs[i];
-        x.kappas[i] = (1 << i) & layermask ? TexKappas.Sample(defaultSampler, float3(uv, i)) : Kappas[i];
-#ifdef TM6
-        x.sigma_s[i] = (1 << i) & layermask ? TexSigma_S.Sample(defaultSampler, float3(uv, i)) : Sigma_S[i];
-        x.sigma_k[i] = (1 << i) & layermask ? TexSigma_K.Sample(defaultSampler, float3(uv, i)) : Sigma_K[i];
-        x.depths[i] = (1 << i) & layermask ? TexDepths.Sample(defaultSampler, float3(uv, i)) : Depths[i];
-        x.gs[i] = (1 << i) & layermask ? TexPhase.Sample(defaultSampler, float3(uv, i)) : G[i];
-#endif        
-        x.rough[i] = (1 << i) & layermask ? TexRoughs.Sample(defaultSampler, float3(uv, i)) : Roughs[i];
-
-    }
-    
-    x.NumLayers = NumLayers;
-    return x;
-
-}
+//LayerProperties sample_layer_textures(float2 uv, uint layermask)
+//{
+//    LayerProperties x = zero_initialise_layers();
+//    for (int i = 0; i <= NumLayers + 1; i++) //indexing starts at 1,
+//    {
+//        x.iors[i] = (1 << i) & layermask ? TexIORs.Sample(defaultSampler, float3(uv, i)) : IORs[i];
+//        x.kappas[i] = (1 << i) & layermask ? TexKappas.Sample(defaultSampler, float3(uv, i)) : Kappas[i];
+//#ifdef TM6
+//        x.sigma_s[i] = (1 << i) & layermask ? TexSigma_S.Sample(defaultSampler, float3(uv, i)) : Sigma_S[i];
+//        x.sigma_k[i] = (1 << i) & layermask ? TexSigma_K.Sample(defaultSampler, float3(uv, i)) : Sigma_K[i];
+//        x.depths[i] = (1 << i) & layermask ? TexDepths.Sample(defaultSampler, float3(uv, i)) : Depths[i];
+//        x.gs[i] = (1 << i) & layermask ? TexPhase.Sample(defaultSampler, float3(uv, i)) : G[i];
+//#endif        
+//        x.rough[i] = (1 << i) & layermask ? TexRoughs.Sample(defaultSampler, float3(uv, i)) : Roughs[i];
+//
+//    }
+//    
+//    x.NumLayers = NumLayers;
+//    return x;
+//
+//}
 
 
 //helper function to truncate full precision constant buffer to
@@ -223,6 +223,7 @@ min16float3 safe_div(min16float3 n, min16float3 d)
 {
     
     min16float3 r;
+    //EPSILON should be 16bit float eps...
     r.x = abs(d.x) > EPSILON ? n.x / d.x : 0.0;
     r.y = abs(d.y) > EPSILON ? n.y / d.y : 0.0;
     r.z = abs(d.z) > EPSILON ? n.z / d.z : 0.0;

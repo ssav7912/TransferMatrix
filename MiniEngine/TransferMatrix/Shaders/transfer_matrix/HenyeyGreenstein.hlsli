@@ -10,15 +10,30 @@ static const min16float HALF_PI = 3.14159265;
 struct henyey_greenstein
 {
     real asymmetry;
-    real3 mean;
+    real3 mean; //not even used?
     real3 norm;
 };
+
+struct hg_nomean
+{
+    real asymmetry;
+    real3 norm;
+};
+
 
 henyey_greenstein zero_hg()
 {
     henyey_greenstein h;
     h.asymmetry = 0.0;
     h.mean = 0.0.xxx;
+    h.norm = 0.0.xxx;
+    return h;
+}
+
+hg_nomean zero_hg_nomean()
+{
+    hg_nomean h;
+    h.asymmetry = 0.0;
     h.norm = 0.0.xxx;
     return h;
 }

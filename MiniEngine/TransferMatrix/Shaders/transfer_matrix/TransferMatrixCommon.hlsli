@@ -21,6 +21,7 @@
 #define HALFEPSILON 2E-10
 
 
+
 struct sample_record
 {
     float3 incident;
@@ -455,12 +456,6 @@ float3 MitsubaLSToCartesianTS(float3 mitsuba)
 }
 
 
-//TODO: Probably drop TIR for being too expensive.
-real3 TIR_lookup(float3 coords)
-{
-    return TIR_LUT.Sample(LUTSampler, coords);
-}
-
 
 //Lagarde 2011. Compute fresnel reflectance at 0 degrees from IOR
 float3 f0(float3 ior)
@@ -574,6 +569,8 @@ float3 fresnelConductorApprox(float cosThetaI, float3 ior, float3 kappa)
 }
 
 
+
+
 float3 sample_GGX(float2 sample, float alpha, out float pdf)
 {
     float cosThetaM = 0.0f;
@@ -596,6 +593,12 @@ float3 sample_GGX(float2 sample, float alpha, out float pdf)
     float sinThetaM = sqrt(max(0.0f, 1 - cosThetaM * cosThetaM));
     
     return float3(sinThetaM * cosPhiM, sinThetaM * sinPhiM, cosThetaM);
+}
+
+real smithG1(real NdotV, real alpha)
+{
+    real a2 = alpha * alpha;
+    return 2.0 / (1.0 + sqrt(1.0 + a2 * (1.0 - NdotV * NdotV)) / (NdotV * NdotV));
 }
 
 //assume isotropic
@@ -769,6 +772,13 @@ float3 sample_GGX_Visible(float3 incident, float2 samplePoint, float rough, out 
 }
 
 //Karis 2013 distribution.
+min16float D_GGX_Karis(min16float NdotH, min16float rough)
+{
+    min16float rough_square = rough * rough;
+    min16float f = (NdotH * NdotH) * (rough_square - 1.0) + 1.0;
+    return rough_square / (HALF_PI * f * f);
+}
+
 float D_GGX_Karis(float NdotH, float rough)
 {
     float rough_square = rough * rough;
@@ -784,11 +794,79 @@ float smithG(float3 incident, float3 outgoing, float3 m, float rough)
 
 //https://ubm-twvideo01.s3.amazonaws.com/o1/vault/gdc2017/Presentations/Hammon_Earl_PBR_Diffuse_Lighting.pdf
 //Earl H. (2017)
+min16float smithG2(min16float3 V, min16float3 N, min16float3 L, min16float rough)
+{
+    min16float numerator = 2.0 * (abs(dot(N, L)) * abs(dot(N, V)));
+    min16float denominator = lerp(2.0 * abs(dot(N, L)) * abs(dot(N, V)), abs(dot(N, L)) + abs(dot(N, V)), rough);
+    return numerator / denominator;
+}
+
 float smithG2(float3 V, float3 N, float3 L, float rough)
 {
     float numerator = 2.0f * (abs(dot(N, L)) * abs(dot(N, V)));
     float denominator = lerp(2.0f * abs(dot(N, L)) * abs(dot(N, V)), abs(dot(N, L)) + abs(dot(N, V)), rough);
     return numerator / denominator;
+}
+
+
+// [Lagarde & De Rousiers, 2014] Moving Frostbite to Physically Based Rendering 3.0
+//Lobe off-peak shift correction (Section 4.9.3)
+float3 lobe_mean_shift(float3 incident, float masking_shadowing, float3 Normal)
+{
+    return masking_shadowing * Normal + (1.0 - masking_shadowing) * incident;
+}
+
+float3 specular_dominant(float3 normal, float3 outgoing, float NdotV, float rough)
+{
+    float lerpFactor = pow(1 - NdotV, 10.8649) * (1 - 0.298475 * log(39.4115 - 39.0029 * rough))
+        + 0.298475 * log(39.4115 - 39.0029 * rough);
+    
+    return lerp(normal, outgoing, lerpFactor);
+}
+
+// [Lagarde & De Rousiers, 2014]
+float3 specular_dominant_approx(float3 normal, float3 outgoing, float rough)
+{
+    float smooth = saturate(1.0 - rough);
+    float lerpFactor = smooth * (sqrt(smooth) + rough);
+    return lerp(normal, outgoing, lerpFactor);
+}
+
+//TODO: Probably drop TIR for being too expensive.
+real TIR_lookup(float3 coords)
+{
+    return TIR_LUT.Sample(LUTSampler, coords);
+}
+
+real TIR_analytical(real cti, real rough, real ior_12, real ior_10)
+{
+    float3 wo = 0.xxx;
+    wo.x = sin(0.25 * PI * (1.0 + cti));
+    wo.z = sqrt(1.0 - (wo.x * wo.x));
+    
+    float alpha = max(rough, 0.01);
+    float3 wi = 0.xxx;
+    wi.z = cti;
+    
+    float3 normal = float3(0, 0, 1);
+    
+    float3 off_specular = specular_dominant(normal, wo, dot(normal, wi), alpha);
+    
+    
+    float3 ws = -reflect(wo, off_specular);
+    
+    
+    real value = 0;
+   
+    real R = fresnelDielectric(dot(wo, off_specular), ior_12);
+        
+    value += R * smithG1(ws.z, alpha);
+        
+    value *= (1.0 - fresnelDielectric(wo.z, ior_10)) * step(ws.z, 0); //branch elimination, make value 0 if ws.z <= 0 
+             
+   
+
+    return value;
 }
 
 
@@ -891,27 +969,4 @@ void albedo(float cti, real alpha, real3 ior_ij, real3 kappa_ij, out real3 r_ij)
     
     r_ij = sample_FGD(cti, alpha, ior_ij, kappa_ij);
 
-}
-
-// [Lagarde & De Rousiers, 2014] Moving Frostbite to Physically Based Rendering 3.0
-//Lobe off-peak shift correction (Section 4.9.3)
-float3 lobe_mean_shift(float3 incident, float masking_shadowing, float3 Normal)
-{
-    return masking_shadowing * Normal + (1.0 - masking_shadowing) * incident;
-}
-
-float3 specular_dominant(float3 normal, float3 outgoing, float NdotV, float rough)
-{
-    float lerpFactor = pow(1 - NdotV, 10.8649) * (1 - 0.298475 * log(39.4115 - 39.0029 * rough))
-        + 0.298475 * log(39.4115 - 39.0029 * rough);
-    
-    return lerp(normal, outgoing, lerpFactor);
-}
-
-// [Lagarde & De Rousiers, 2014]
-float3 specular_dominant_approx(float3 normal, float3 outgoing, float rough)
-{
-    float smooth = saturate(1.0 - rough);
-    float lerpFactor = smooth * (sqrt(smooth) + rough);
-    return lerp(normal, outgoing, lerpFactor); 
 }

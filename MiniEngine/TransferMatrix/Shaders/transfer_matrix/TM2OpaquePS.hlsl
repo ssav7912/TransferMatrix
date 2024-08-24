@@ -84,14 +84,25 @@ void outgoing_lobes(float3 incident, real3 ior[LAYERS_MAX], real3 kappas[LAYERS_
 #if !defined(DISABLE_TIR) || DISABLE_TIR == 0
             if (ior_ij < 1.0)
             {
+#if !defined ANALYTIC_TIR || ANALYTIC_TIR == 0
                 tir_norm = TIR_lookup(float3(abs(ops[i].reflection_down.mean.z), hg_to_ggx(asymmetry_T_0i), ior_ij)) * ops[i].transmission_down.norm;
             
+#else
+                tir_norm = TIR_analytical(abs(ops[i].reflection_down.mean.z), hg_to_ggx(asymmetry_T_0i), ior_ij, 1.0/float3_average(ior[i])) * ops[i].transmission_down.norm;
+#endif
                 ops[i].reflection_down.norm += tir_norm;
                 ops[i].transmission_down.norm -= tir_norm;
             }
             else
             {
+#if !defined ANALYTIC_TIR || ANALYTIC_TIR == 0
+
                 tir_norm = TIR_lookup(float3(abs(ops[i].transmission_down.mean.z), hg_to_ggx(asymmetry_T_0j_R), ior_ji)) * ops[i].transmission_up.norm;
+#else
+  
+                tir_norm = TIR_analytical(abs(ops[i].transmission_down.mean.z), hg_to_ggx(asymmetry_T_0j_R), ior_ji, 1.0 / float3_average(ior[i + 1])) * ops[i].transmission_up.norm;
+#endif
+
                 
                 ops[i].reflection_up.norm += tir_norm;
                 ops[i].transmission_up.norm -= tir_norm; //could go negative if transfer_factors produces negative norm?
@@ -140,9 +151,18 @@ float3 eval_lobe(const sample_record rec, const hg_nomean lobe)
         return 0.0;
     }
     const real rough = hg_to_ggx(lobe.asymmetry);
+#if !defined(USE_EARL_G2) || USE_EARL_G2 == 0
     const real G2 = smithG1(rec.incident, H, rough) * smithG1(rec.outgoing, H, rough);
+#else
+    const real G2 = smithG2(rec.outgoing, H, rec.incident, rough); 
+#endif
+    
+#if !defined(USE_D_KARIS) || USE_D_KARIS == 0
     const real D = D_GGX(H, rough); //TODO: check that H is correct use...
-        
+#else
+    const real3 N = float3(0,0,1);
+    const real D = D_GGX_Karis(dot(N, H), rough);
+#endif
     const float f = G2 * D / (4.0 * rec.incident.z);
         
     float3 throughput = lobe.norm * f;
@@ -221,8 +241,11 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
             
                 const float3 H = normalize(incoming + outgoing);
                 const float G1 = smithG1(incoming, H, rough);
+#if !defined(USE_D_KARIS) || USE_D_KARIS == 0
                 const float D = D_GGX(H, rough);
-            
+            #else
+                const float D = D_GGX_Karis(dot(N, H), rough);
+#endif                
                 lobe_pdf = (lobe_weight * G1 * D / (4.0 * incoming.z)) / weight_sum;
             }
         
@@ -231,15 +254,22 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
             {
                 //top reflection correction. [Bati 2019]
                 const real TopRough = props.rough[1];
-                float G = smithG(rec.incident, rec.outgoing, H, TopRough);
+#if !defined(USE_EARL_G2) || USE_EARL_G2 == 0
+                const real G2_0 = smithG(rec.incident, rec.outgoing, H, TopRough);
+#else
+                const real G2_0 = smithG2(rec.outgoing, H, rec.incident, TopRough);
+#endif
                 const float3 TopLobeOutgoing = specular_dominant(H, rec.outgoing, dot(H, rec.incident), TopRough);
                 
                 const float3 topOutgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(TopLobeOutgoing));
                 const float BottomLOD = TopRough * IBLRange + IBLBias;
                 const float3 TopIBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, topOutgoingWS, BottomLOD);
 
-                const real G2_0 = smithG(rec.incident, rec.outgoing, H, TopRough);
+#if !defined(USE_D_KARIS) || USE_D_KARIS == 0
                 const real D0_0 = D_GGX(H, TopRough);
+#else
+                const real D0_0 = D_GGX_Karis(dot(N, H), rough);
+#endif
                 real3 F0 = 0.0.xxx;
                 const real3 ior_01 = props.iors[1] / props.iors[0];
                 if (isZero(props.kappas[1]))
@@ -257,7 +287,11 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
              //only evaluate layers when not in air-substrate interface.
             if (i >= 1)
             {
+#if !defined(USE_EARL_G2) || USE_EARL_G2 == 0
                 const float G = smithG(rec.incident, rec.outgoing, H, rough);
+#else
+                const float G = smithG2(rec.outgoing, H, rec.incident, rough);
+#endif
                 const float3 lobeOutgoing = specular_dominant(H, rec.outgoing, dot(H, rec.incident), rough);
                 
                 const float3 lobeOutgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(lobeOutgoing));

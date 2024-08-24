@@ -175,7 +175,7 @@
       <HeaderFileOutput>$(SolutionDir)..\Build\$(Platform)\$(Configuration)\Output\$(ProjectName)\CompiledShaders\%(Filename).h</HeaderFileOutput>
       <ObjectFileOutput />
       <ShaderModel>6.2</ShaderModel>
-      <PreprocessorDefinitions>USE_FAST_FGD=0; USEFP16=0</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_FAST_FGD=0; USEFP16=0; USE_D_KARIS=0;USE_EARL_G2=0; DISABLE_TIR=0;ANALYTIC_TIR=0</PreprocessorDefinitions>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -199,7 +199,7 @@
       <ShaderModel>6.2</ShaderModel>
       <VariableName>g_p%(Filename)</VariableName>
       <HeaderFileOutput>$(SolutionDir)..\Build\$(Platform)\$(Configuration)\Output\$(ProjectName)\CompiledShaders\%(Filename).h</HeaderFileOutput>
-      <PreprocessorDefinitions>USE_FAST_FGD=0; USEFP16=0; USE_D_KARIS=0</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_FAST_FGD=0; USEFP16=0; USE_D_KARIS=0;USE_EARL_G2=0; DISABLE_TIR=0;ANALYTIC_TIR=0</PreprocessorDefinitions>
       <EnableDebuggingInformation>true</EnableDebuggingInformation>
     </FxCompile>
   </ItemDefinitionGroup>
@@ -209,7 +209,7 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions) ; USEFP16=1;USEFP16=0</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions) ;USEFP16=0</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>..\TransferMatrix;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <LanguageStandard>stdcpp20</LanguageStandard>
@@ -224,7 +224,7 @@
       <ShaderModel>6.2</ShaderModel>
       <VariableName>g_p%(Filename)</VariableName>
       <HeaderFileOutput>$(SolutionDir)..\Build\$(Platform)\$(Configuration)\Output\$(ProjectName)\CompiledShaders\%(Filename).h</HeaderFileOutput>
-      <PreprocessorDefinitions>USE_FAST_FGD=0; USEFP16=1</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_FAST_FGD=0; USEFP16=1; USE_D_KARIS=0;USE_EARL_G2=0; DISABLE_TIR=0;ANALYTIC_TIR=0</PreprocessorDefinitions>
       <EnableDebuggingInformation>true</EnableDebuggingInformation>
     </FxCompile>
   </ItemDefinitionGroup>

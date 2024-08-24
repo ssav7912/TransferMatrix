@@ -423,8 +423,8 @@ namespace EngineProfiling
 {
     BoolVar DrawFrameRate("Display Frame Rate", true);
     BoolVar DrawProfiler("Display Profiler", false);
-    //BoolVar DrawPerfGraph("Display Performance Graph", false);
-    const bool DrawPerfGraph = false;
+    BoolVar DrawPerfGraph("Display Performance Graph", false);
+    //const bool DrawPerfGraph = false;
     
     void Update( void )
     {
@@ -484,7 +484,7 @@ namespace EngineProfiling
             Text.DrawString("Engine Profiling");
             Text.SetColor(Color(0.8f, 0.8f, 0.8f));
             Text.SetTextSize(20.0f);
-            Text.DrawString("           CPU    GPU");
+            Text.DrawString("           CPU    GPU   GPU Min  GPU Max");
             Text.SetTextSize(24.0f);
             Text.NewLine();
             Text.SetTextSize(20.0f);
@@ -585,7 +585,7 @@ void NestedTimingTree::DisplayNode( TextContext& Text, float leftMargin, float i
 
         Text.DrawString(m_Name.c_str());
         Text.SetCursorX(leftMargin + 300.0f);
-        Text.DrawFormattedString("%6.3f %6.3f   ", m_CpuTime.GetAvg(), m_GpuTime.GetAvg());
+        Text.DrawFormattedString("%6.3f %6.3f %6.3f %6.3f    ", m_CpuTime.GetAvg(), m_GpuTime.GetAvg(), m_GpuTime.GetMin(), m_GpuTime.GetMax());
 
         if (IsGraphed())
         {

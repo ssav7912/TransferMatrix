@@ -86,7 +86,7 @@ void outgoing_lobes(float3 incident, real3 ior[LAYERS_MAX], real3 kappas[LAYERS_
             {
 #if !defined ANALYTIC_TIR || ANALYTIC_TIR == 0
                 tir_norm = TIR_lookup(float3(abs(ops[i].reflection_down.mean.z), hg_to_ggx(asymmetry_T_0i), ior_ij)) * ops[i].transmission_down.norm;
-            
+                //tir_norm = 1.5 * ior_ij;
 #else
                 tir_norm = TIR_analytical(abs(ops[i].reflection_down.mean.z), hg_to_ggx(asymmetry_T_0i), ior_ij, 1.0/float3_average(ior[i])) * ops[i].transmission_down.norm;
 #endif
@@ -98,8 +98,8 @@ void outgoing_lobes(float3 incident, real3 ior[LAYERS_MAX], real3 kappas[LAYERS_
 #if !defined ANALYTIC_TIR || ANALYTIC_TIR == 0
 
                 tir_norm = TIR_lookup(float3(abs(ops[i].transmission_down.mean.z), hg_to_ggx(asymmetry_T_0j_R), ior_ji)) * ops[i].transmission_up.norm;
-#else
-  
+                //tir_norm = 1.5 * ior_ji;
+#else            
                 tir_norm = TIR_analytical(abs(ops[i].transmission_down.mean.z), hg_to_ggx(asymmetry_T_0j_R), ior_ji, 1.0 / float3_average(ior[i + 1])) * ops[i].transmission_up.norm;
 #endif
 

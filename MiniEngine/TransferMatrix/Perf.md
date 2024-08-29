@@ -110,3 +110,6 @@ term entirely, although this will harm the energy conservation of the model.
 
 Using a resampled form of the TIR and FGD LUTs with R16 formats rather than R32 improves speed *significantly* - 227 microseconds! VALU utilisation increases to 55% in this case. 
 There seems to be some problem with numerical robustness however, as NaNs are introduced under high roughnesses.
+
+
+Dropping the unused mean term from the HenyeyGreenstein representation seems to improve performance of the 2-flux model to 950 microseconds...

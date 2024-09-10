@@ -261,15 +261,10 @@ float float3_max(float3 v)
     return max(v.x, max(v.y, v.z));
 }
 
-min16float float3_average(min16float3 f)
-{
-    return (f.x + f.y + f.z) / 3.0;
-}
-
-float float3_average(float3 f)
+float float3_average(real3 f)
 {
     
-    return (f.x + f.y + f.z) / 3.0f;
+    return (f.x + f.y + f.z) / 3.0;
 
 }
 
@@ -295,20 +290,20 @@ float3 reflectSpherical(float3 incident, float3 normal)
     return 2 * dot(incident, normal) * normal - incident;
 }
 
-min16float3 reflectZ(min16float3 f)
-{
-    return min16float3(-f.xy, f.z);
-}
+//min16float3 reflectZ(min16float3 f)
+//{
+//    return min16float3(-f.xy, f.z);
+//}
 
 float3 reflectZ(float3 f)
 {
     return float3(-f.xy, f.z);
 }
 
-min16float3 refractZ(min16float3 f, min16float ior)
-{
-    return refract(f, min16float3(0.0, 0.0, copy_sign(1.0, f.z)), ior);
-}
+//min16float3 refractZ(min16float3 f, min16float ior)
+//{
+//    return refract(f, min16float3(0.0, 0.0, copy_sign(1.0, f.z)), ior);
+//}
 
 float3 refractZ(float3 f, float ior)
 {
@@ -641,7 +636,7 @@ float smithG1(float3 v, float3 m, float alpha)
     
     float root = alpha * tantheta;
                     //hypot2
-    return saturate(2.0f / (1.0f + 1.0f * 1.0f + root * root));
+    return saturate(2.0 / (1.0 + 1.0 * 1.0 + root * root));
 
 }
 
@@ -894,8 +889,10 @@ real3 sample_FGD(float cti, real alpha, real3 ior, real3 kappa)
     //why doesn't this warn?
      output = (splitsum.x + float3_average(f0(ior)) * splitsum.y).xxx;
 #else
+    static const uint NumDimensions = 4;
     static const uint DimensionXY = 64;
     static const uint DimensionZ = DimensionXY * 32;
+    static const uint DimensionW = 32;
     
     static const float DimensionXMin = 0.0f;
     static const float DimensionXMax = 1.0f;
@@ -913,9 +910,12 @@ real3 sample_FGD(float cti, real alpha, real3 ior, real3 kappa)
     
     //remap Z & W index from being within [0,64] range to [0,2048]
     //Z index is normalised [0,64] range stretched to [0,2048]
-    const float3 ior_index = saturate((ior - DimensionZMin) / (DimensionZMax - DimensionZMin)) / DimensionZ;
-    //W index is normalised [0,64] range + Z index.
-    const float3 kappa_index = saturate((kappa - DimensionWMin) / (DimensionWMax - DimensionWMin));
+    const float3 ior_norm = (ior - DimensionZMin) / (DimensionZMax - DimensionZMin);
+    const float3 ior_index = saturate((trunc(ior_norm * (DimensionXY - 1)) / (DimensionXY - 1)));
+    
+    //W index is normalised [0,32] range + Z index.
+    const float3 kappa_norm = (kappa - DimensionWMin) / (DimensionWMax - DimensionWMin);
+    const float3 kappa_index = saturate((trunc(kappa_norm * (DimensionW - 1)) / (DimensionW - 1)) / (DimensionZ - 1));
    
     const float3 ZIndex = saturate(ior_index + kappa_index);
     
@@ -926,7 +926,7 @@ real3 sample_FGD(float cti, real alpha, real3 ior, real3 kappa)
     output.z = FGD_LUT.Sample(LUTSampler, float3(cti_index, alpha_index, ZIndex.z));
 #endif
     
-    return output;
+    return output; // float3(cti_index * (DimensionXY - 1), alpha_index * (DimensionXY - 1), ZIndex.x * (DimensionZ - 1))
 }
 
 //could i just reuse the FGD LUT for this?
@@ -950,7 +950,7 @@ void albedos(float cti, real alpha, real ior_ij, out real3 r_ij, out real3 t_ij,
     }
     
 
-    r_ij = sample_FGD(cti, alpha, ior_ij.xxx, 0.0.xxx);
+    r_ij = sample_FGD(cti , alpha, ior_ij.xxx, 0.0.xxx);
     
     
     r_ji = r_ij;

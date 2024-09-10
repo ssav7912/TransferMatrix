@@ -71,7 +71,8 @@ void dielectric_transfer_factors(float3 incident, real ior, real alpha, out laye
     real ior_ji = 0.0;
     real s_t_ij = 0.0;
     real s_t_ji = 0.0;
-    
+    ops = zero_init_tm2_components();
+
     if (abs(ior - 1.0) < 1e-5)
     {
         ops.component_type = TM_TYPE_NOCOMPONENT;
@@ -105,6 +106,7 @@ void dielectric_transfer_factors(float3 incident, real ior, real alpha, out laye
 
 void conductor_transfer_factors(float3 incident, real3 ior, real3 kappa, real rough, out layer_components_tm2 ops)
 {
+    ops = zero_init_tm2_components();
     ops.component_type = TM_TYPE_CONDUCTORINTERFACE;
     
     ops.reflection_down.asymmetry = ggx_to_hg(rough);

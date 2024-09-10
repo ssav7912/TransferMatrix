@@ -161,7 +161,7 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions); DEBUG;USEFP16=1</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions); DEBUG;USEFP16=0</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
       <AdditionalIncludeDirectories>..\TransferMatrix;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
@@ -226,6 +226,7 @@
       <HeaderFileOutput>$(SolutionDir)..\Build\$(Platform)\$(Configuration)\Output\$(ProjectName)\CompiledShaders\%(Filename).h</HeaderFileOutput>
       <PreprocessorDefinitions>USE_FAST_FGD=0; USEFP16=0; USE_D_KARIS=0;USE_EARL_G2=0; DISABLE_TIR=0;ANALYTIC_TIR=0</PreprocessorDefinitions>
       <EnableDebuggingInformation>true</EnableDebuggingInformation>
+      <TreatWarningAsError>false</TreatWarningAsError>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>

@@ -64,6 +64,8 @@ void outgoing_lobes(float3 incident, real3 ior[LAYERS_MAX], real3 kappas[LAYERS_
     [loop]
     for (int i = 0; i < NumLayers; i++)
     {
+        
+        
         //goddamn numerical robustness
         //wonder what the cost of throwing safe_divs everywhere is...
         lobes[i] = zero_hg_nomean();
@@ -73,12 +75,12 @@ void outgoing_lobes(float3 incident, real3 ior[LAYERS_MAX], real3 kappas[LAYERS_
             ior_ji = 1.0 / ior_ij;
             
             asymmetry_T_0j = hg_refract(asymmetry_T_0i, ior_ji) * ops[i].transmission_down.asymmetry;
-            asymmetry_T_0j_R = asymmetry_T_0j * ops[i + 1].reflection_down.asymmetry;
+            asymmetry_T_0j_R = asymmetry_T_0j * ops[i + 1].reflection_down.asymmetry; //uninitialised??
             asymmetry_T_0j_RT = hg_refract(asymmetry_T_0j_R, ior_ij) * ops[i].transmission_up.asymmetry;
             
-            ops[i].transmission_down.asymmetry = asymmetry_T_0i != 0.0 ? asymmetry_T_0j / asymmetry_T_0i : 0.0;
+            ops[i].transmission_down.asymmetry = safe_div(asymmetry_T_0j, asymmetry_T_0i);
             
-            ops[i].transmission_up.asymmetry = asymmetry_T_0j_R != 0.0 ? asymmetry_T_0j_RT / asymmetry_T_0j_R : 0.0;
+            ops[i].transmission_up.asymmetry = safe_div(asymmetry_T_0j_RT, asymmetry_T_0j_R);
         
             //toggle to disable the TIR correction. Breaks conservation but seems to massively improve performance.
 #if !defined(DISABLE_TIR) || DISABLE_TIR == 0
@@ -129,7 +131,9 @@ void outgoing_lobes(float3 incident, real3 ior[LAYERS_MAX], real3 kappas[LAYERS_
         energy_r_i_average = float3_average(energy_r_i);
         
         lobes[i].norm = energy_r_i;
-        lobes[i].asymmetry = energy_r_i_average > 0.0f ? min((asymmetry_r_0i - asymmetry_r_0h) / energy_r_i_average, 1.0) : 0.0;
+
+        
+        lobes[i].asymmetry = min(safe_div((asymmetry_r_0i - asymmetry_r_0h), energy_r_i_average), 1.0);
         //lobes[i].mean = ops[i].reflection_up.mean; //maybe totally wrong?
         
         energy_r_0h = energy_r_0i;
@@ -152,7 +156,7 @@ float3 eval_lobe(const sample_record rec, const hg_nomean lobe)
     }
     const real rough = hg_to_ggx(lobe.asymmetry);
 #if !defined(USE_EARL_G2) || USE_EARL_G2 == 0
-    const real G2 = smithG1(rec.incident, H, rough) * smithG1(rec.outgoing, H, rough);
+    const real G2 = smithG(rec.incident, rec.outgoing, H, rough);
 #else
     const real G2 = smithG2(rec.outgoing, H, rec.incident, rough); 
 #endif
@@ -210,7 +214,6 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
         weight_sum += float3_average(lobes[k].norm);
     }
     
-
     
 
     [loop]
@@ -247,11 +250,13 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
                 const float D = D_GGX_Karis(dot(N, H), rough);
 #endif                
                 lobe_pdf = (lobe_weight * G1 * D / (4.0 * incoming.z)) / weight_sum;
+
             }
         
         
             if (i == 0)
             {
+                
                 //top reflection correction. [Bati 2019]
                 const real TopRough = props.rough[1];
 #if !defined(USE_EARL_G2) || USE_EARL_G2 == 0
@@ -281,12 +286,14 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
                     F0 = fresnelConductorExact(dot(rec.incident, H), ior_01, props.kappas[1] / props.iors[0]);
                 }
 
-                throughput += ((F0 * G2_0 * D0_0 / (4.0f * rec.incident.z)) / lobe_pdf) * TopIBLSample;
+                throughput += ((F0 * G2_0 * D0_0 / (4.0 * rec.incident.z)) / lobe_pdf) * TopIBLSample;
             }
               
              //only evaluate layers when not in air-substrate interface.
             if (i >= 1)
             {
+                
+                
 #if !defined(USE_EARL_G2) || USE_EARL_G2 == 0
                 const float G = smithG(rec.incident, rec.outgoing, H, rough);
 #else
@@ -330,7 +337,7 @@ float4 main(VSOutput vsOutput) : SV_Target0
         //feel like there's something wrong with the CRS i'm providing,
         //but I don't know what.
         cartesianTSToMitsubaLS(mul(WorldToTangent, ViewerRay)),
-        normalize(cartesianTSToMitsubaLS(mul(WorldToTangent, reflect(-ViewerRay, normal)))),
+        cartesianTSToMitsubaLS(mul(WorldToTangent, reflect(-ViewerRay, normal))),
 
         1.0f,
         true,
@@ -340,10 +347,18 @@ float4 main(VSOutput vsOutput) : SV_Target0
     
     LayerProperties props = truncate_layer_parameters();
    
-    float3 output = sample_preintegrated(rec, TangentToWorld, props);
-    //float3 output = 0.0;
+   float3 output = sample_preintegrated(rec, TangentToWorld, props);
     
+    //layer_components_tm2 ops[LAYERS_MAX];
+    //components_transfer_factors(rec.incident, props.iors, props.kappas, props.rough, ops);
+    //
+    hg_nomean lobes[LAYERS_MAX];
+    outgoing_lobes(rec.incident, props.iors, props.kappas, props.rough, lobes);
+    //
+    //float3 output = lobes[1].asymmetry.xxx;
+    
+    //float3 output = sample_FGD(0.77, 0.1, 1.0.xxx, float3(1.0, 0.1, 0.1));
     
 	
-    return float4(output, 1.0f);
+    return float4(output, 1.0);
 }

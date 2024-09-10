@@ -56,14 +56,14 @@ float henyey_greenstein_phase_function(float theta, float g)
 real ggx_to_hg(real rough)
 {
     rough = saturate(rough);
-    return -0.085 + ((1.085) / (1.0 + pow((rough / 0.5), 1.3)));
+    return saturate(-0.085 + ((1.085) / (1.0 + pow((rough / 0.5), 1.3))));
 
 }
 
 real hg_to_ggx(real asymmetry)
 {
     asymmetry = clamp(asymmetry,-1.0, 1.0);
-    return clamp(0.5 * pow((1.085) / (max(asymmetry, 0.2) + 0.085) - 1.0, 1.0 / 1.3), 1e-4, 1.);
+    return clamp(0.5 * pow(1.085 / (max(asymmetry, 0.2) + 0.085) - 1.0, 1.0 / 1.3), 1e-4, 1.);
 
 }
 

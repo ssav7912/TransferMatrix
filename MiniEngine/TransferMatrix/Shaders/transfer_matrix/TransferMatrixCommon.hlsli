@@ -305,9 +305,32 @@ float3 reflectZ(float3 f)
 //    return refract(f, min16float3(0.0, 0.0, copy_sign(1.0, f.z)), ior);
 //}
 
+float3 refractMitsuba(float3 wi, float3 n, float ior)
+{
+    if (ior == 1)
+    {
+        return -wi;
+    }
+    
+    float cosThetaI = dot(wi, n);
+    if (cosThetaI > 0)
+    {
+        ior = 1 / ior;
+    }
+    
+    float cosThetaTsqr = 1 - (1 - cosThetaI * cosThetaI) * (ior * ior);
+    
+    if (cosThetaTsqr <= 0.0)
+    {
+        return 0.0.xxx;
+    }
+    
+    return n * (cosThetaI * ior - sign(cosThetaI) * sqrt(cosThetaTsqr)) - wi * ior;
+}
+
 float3 refractZ(float3 f, float ior)
 {
-    return refract(f, float3(0.0f, 0.0f, copy_sign(1.0f, f.z)), ior);
+    return refractMitsuba(f, float3(0.0f, 0.0f, copy_sign(1.0f, f.z)), ior);
 
 }
 
@@ -621,6 +644,8 @@ min16float smithG1(min16float3 v, min16float3 m, min16float alpha)
 //assume isotropic
 float smithG1(float3 v, float3 m, float alpha)
 {
+    alpha = clamp(alpha, EPSILON, 1.0);
+    
     //v.z == Frame::cosTheta
     if (dot(v, m) * v.z <= 0.0f)
     {

@@ -88,7 +88,7 @@ void outgoing_lobes(float3 incident, real3 ior[LAYERS_MAX], real3 kappas[LAYERS_
             {
 #if !defined ANALYTIC_TIR || ANALYTIC_TIR == 0
                 tir_norm = TIR_lookup(float3(abs(ops[i].reflection_down.mean.z), hg_to_ggx(asymmetry_T_0i), ior_ij)) * ops[i].transmission_down.norm;
-                //tir_norm = 1.5 * ior_ij;
+      
 #else
                 tir_norm = TIR_analytical(abs(ops[i].reflection_down.mean.z), hg_to_ggx(asymmetry_T_0i), ior_ij, 1.0/float3_average(ior[i])) * ops[i].transmission_down.norm;
 #endif
@@ -100,7 +100,7 @@ void outgoing_lobes(float3 incident, real3 ior[LAYERS_MAX], real3 kappas[LAYERS_
 #if !defined ANALYTIC_TIR || ANALYTIC_TIR == 0
 
                 tir_norm = TIR_lookup(float3(abs(ops[i].transmission_down.mean.z), hg_to_ggx(asymmetry_T_0j_R), ior_ji)) * ops[i].transmission_up.norm;
-                //tir_norm = 1.5 * ior_ji;
+
 #else            
                 tir_norm = TIR_analytical(abs(ops[i].transmission_down.mean.z), hg_to_ggx(asymmetry_T_0j_R), ior_ji, 1.0 / float3_average(ior[i + 1])) * ops[i].transmission_up.norm;
 #endif
@@ -122,8 +122,8 @@ void outgoing_lobes(float3 incident, real3 ior[LAYERS_MAX], real3 kappas[LAYERS_
         }
         else
         {
-            energy_r_0i = reflection_energy_tm2(energy_0i, ops[i].reflection_down.norm);
-            asymmetry_r_0i = reflection_energy_tm2(asymmetry_0i, float3_average(ops[i].reflection_down.norm) * ops[i].reflection_down.asymmetry);
+           energy_r_0i = reflection_energy_tm2(energy_0i, ops[i].reflection_down.norm);
+           asymmetry_r_0i = reflection_energy_tm2(asymmetry_0i, float3_average(ops[i].reflection_down.norm) * ops[i].reflection_down.asymmetry);
 
         }
         
@@ -134,7 +134,6 @@ void outgoing_lobes(float3 incident, real3 ior[LAYERS_MAX], real3 kappas[LAYERS_
 
         
         lobes[i].asymmetry = min(safe_div((asymmetry_r_0i - asymmetry_r_0h), energy_r_i_average), 1.0);
-        //lobes[i].mean = ops[i].reflection_up.mean; //maybe totally wrong?
         
         energy_r_0h = energy_r_0i;
         asymmetry_r_0h = asymmetry_r_0i;
@@ -191,7 +190,7 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
     
     //get the outgoing lobes
     hg_nomean lobes[LAYERS_MAX];
-    outgoing_lobes(rec.incident, props.iors, props.kappas, props.rough, lobes);
+    outgoing_lobes(rec.outgoing, props.iors, props.kappas, props.rough, lobes);
     
         //shift the outgoing lobe direction to correct for lobe mean.
         
@@ -214,8 +213,6 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
         weight_sum += float3_average(lobes[k].norm);
     }
     
-    
-
     [loop]
     for (int i = 0; i < NumLayers; i++)
     {
@@ -330,15 +327,17 @@ float4 main(VSOutput vsOutput) : SV_Target0
     float3x3 WorldToTangent = float3x3(tangent, bitangent, normal);
     float3x3 TangentToWorld = transpose(WorldToTangent);
     
-    float3 ViewerRay = normalize(ViewerPos - vsOutput.worldPos);
+    const float3 ViewerRay = normalize(ViewerPos - vsOutput.worldPos);
+    
+    const float3 incident = cartesianTSToMitsubaLS(mul(WorldToTangent, ViewerRay));
+    const float3 outgoing = reflectSpherical(incident, float3(0., 0., 1.0)); //reflect about H
     
     sample_record rec =
     {
         //feel like there's something wrong with the CRS i'm providing,
         //but I don't know what.
-        cartesianTSToMitsubaLS(mul(WorldToTangent, ViewerRay)),
-        cartesianTSToMitsubaLS(mul(WorldToTangent, reflect(-ViewerRay, normal))),
-
+        incident,
+        outgoing,
         1.0f,
         true,
         TM_SAMPLE_TYPE_GLOSSY_REFLECTION
@@ -347,18 +346,22 @@ float4 main(VSOutput vsOutput) : SV_Target0
     
     LayerProperties props = truncate_layer_parameters();
    
-   float3 output = sample_preintegrated(rec, TangentToWorld, props);
+    float3 output = sample_preintegrated(rec, TangentToWorld, props);
     
-    //layer_components_tm2 ops[LAYERS_MAX];
-    //components_transfer_factors(rec.incident, props.iors, props.kappas, props.rough, ops);
+    layer_components_tm2 ops[LAYERS_MAX];
+    components_transfer_factors(rec.incident, props.iors, props.kappas, props.rough, ops);
     //
     hg_nomean lobes[LAYERS_MAX];
     outgoing_lobes(rec.incident, props.iors, props.kappas, props.rough, lobes);
     //
-    //float3 output = lobes[1].asymmetry.xxx;
+    //output = lobes[NumLayers-1].norm.xxx;
     
     //float3 output = sample_FGD(0.77, 0.1, 1.0.xxx, float3(1.0, 0.1, 0.1));
     
-	
+    //float3 output = ops[0].transmission_up.mean;
+	       
+
+    
+    
     return float4(output, 1.0);
 }

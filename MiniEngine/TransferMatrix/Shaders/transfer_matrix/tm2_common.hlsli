@@ -33,7 +33,7 @@ layer_components_tm2 zero_init_tm2_components()
 tensor3d2x2 energy_matrix(layer_components_tm2 ops)
 {
     //if the transmission energy is 0, should we make this the identity matrix?
-    tensor3d2x2 e = { 0.0.xxx, 0.0.xxx, 0.0.xxx, 0.0.xxx };
+    tensor3d2x2 e = { 1.0.xxx, 0.0.xxx, 1.0.xxx, 0.0.xxx };
     //can i saturate this.. 
     const real3 t_inv = safe_div(1.0.xxx, ops.transmission_down.norm);
     
@@ -47,7 +47,7 @@ tensor3d2x2 energy_matrix(layer_components_tm2 ops)
 
 real2x2 asymmetry_matrix(layer_components_tm2 ops)
 {
-    real2x2 asymmetry;
+    real2x2 asymmetry = real2x2(1.0, 0.0, 1.0, 0.0);
     
     const real r_asymmetry = ops.reflection_down.asymmetry * float3_average(ops.reflection_down.norm);
     const real t_asymmetry = ops.transmission_down.asymmetry * float3_average(ops.transmission_down.norm);

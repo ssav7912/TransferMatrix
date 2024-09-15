@@ -136,9 +136,11 @@ Texture3D TransferMatrixResources::LoadFGDLUTFromFile(const std::wstring& FGD_pa
 {
 
 	Texture3D FGD{};
-	constexpr size_t Dim = 64;
+	size_t DimX = 64;
+	size_t DimY = 64;
+	size_t DimZ = 2048;
 
-#if USEFP16 == 1
+#if USEFP16 == 1 && FGDRESAMPLED != 1
 	const DXGI_FORMAT pixel_format = DXGI_FORMAT_R16_FLOAT;
 
 	DirectX::ScratchImage img{};
@@ -149,6 +151,23 @@ Texture3D TransferMatrixResources::LoadFGDLUTFromFile(const std::wstring& FGD_pa
 
 	const void* data_ptr = img.GetPixels(); 
 	const size_t RowPitchBytes = Dim * sizeof(uint16_t); //half precision.
+#elif FGDRESAMPLED == 1
+
+	const DXGI_FORMAT pixel_format = DXGI_FORMAT_R32_FLOAT;
+	std::vector<float> data;
+	int32_t size[3] = { 0 };
+	LoadLUTFromFile<3>(FGD_path, data, size);
+
+	DimX = size[0];
+	DimY = size[1];
+	DimZ = size[2];
+
+	ASSERT(data.size() == DimX * DimY * DimZ);
+ 
+
+	const void* data_ptr = data.data();
+	const size_t RowPitchBytes = DimX * sizeof(float);
+
 #else
 	const DXGI_FORMAT pixel_format = DXGI_FORMAT_R32_FLOAT;
 	std::vector<float> data;
@@ -163,20 +182,25 @@ Texture3D TransferMatrixResources::LoadFGDLUTFromFile(const std::wstring& FGD_pa
 
 
 	size_t i = 0; 
-	while (i < new_data.size())
+	size_t src_index = i;
+	size_t end_index = i + StrideDimension4;
+	size_t dest_index = i;
+	while (dest_index < new_data.size())
 	{
 		//copy from i to next element in stride
-		const auto src_index = i;
-		const auto end_index = i + StrideDimension4;
-		const auto dest_index =  i;
-		std::copy(data.begin() + src_index, data.begin() + std::min(new_data.size(), end_index), new_data.begin() + dest_index);
+		std::copy(data.begin() + src_index, data.begin() + end_index, new_data.begin() + dest_index);
 		if (i % 2 == 0 && i != 0)
 		{
-			i++;
+			src_index += 0;
+
 		}
 		else {
-			i += StrideDimension4;
+			src_index += StrideDimension4;
 		}
+		dest_index += StrideDimension4;
+		end_index = src_index + StrideDimension4;
+
+		i++;
 	}
 
 	ASSERT(std::none_of(new_data.cbegin(), new_data.cend(), [](float v) -> bool {return std::isnan(v); }));
@@ -197,12 +221,12 @@ Texture3D TransferMatrixResources::LoadFGDLUTFromFile(const std::wstring& FGD_pa
 	const void* data_ptr = new_data.data();
 
 	//encode 4D LUT in 3D texture, Z dim encodes Z + W of index.
-	//i.e. dim = 64 * 64 * (64 * 64) = 64 * 64 * 4096. 
+	//i.e. dim = 64 * 64 * (64 * 32) = 64 * 64 * 32. 
 	const size_t RowPitchBytes = Dim * sizeof(float);
 #endif
 
 
-	FGD.Create3D(RowPitchBytes, Dim, Dim, Dim * (Dim/2), pixel_format, data_ptr);
+	FGD.Create3D(RowPitchBytes, DimX, DimY, DimZ, pixel_format, data_ptr);
 
 	return FGD;
 }

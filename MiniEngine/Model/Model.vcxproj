@@ -62,15 +62,15 @@
     </FxCompile>
     <ClCompile>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">stdcpp20</LanguageStandard>
-      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">__WRL_NO_DEFAULT_LIB__;%(PreprocessorDefinitions); USEFP16=0</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">__WRL_NO_DEFAULT_LIB__;%(PreprocessorDefinitions); USEFP16=0;FGDRESAMPLED=1</PreprocessorDefinitions>
     </ClCompile>
     <ClCompile>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">stdcpp20</LanguageStandard>
-      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">__WRL_NO_DEFAULT_LIB__;%(PreprocessorDefinitions); USEFP16=0</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">__WRL_NO_DEFAULT_LIB__;%(PreprocessorDefinitions); USEFP16=0;FGDRESAMPLED=1</PreprocessorDefinitions>
     </ClCompile>
     <ClCompile>
       <LanguageStandard Condition="'$(Configuration)|$(Platform)'=='Release|x64'">stdcpp20</LanguageStandard>
-      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">__WRL_NO_DEFAULT_LIB__;%(PreprocessorDefinitions); USEFP16=0</PreprocessorDefinitions>
+      <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">__WRL_NO_DEFAULT_LIB__;%(PreprocessorDefinitions); USEFP16=0;FGDRESAMPLED=1</PreprocessorDefinitions>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>

@@ -82,9 +82,12 @@ namespace Renderer
 void Renderer::Initialize(void)
 {
     ///TM2 PSOs
-#if USEFP16 == 1
+#if USEFP16 == 1 && FGDRESAMPLED != 1
     const std::wstring TIR_LUT = L"tm_TIR.dds";
     const std::wstring FGD_LUT = L"tm_FGD.dds";
+#elif FGDRESAMPLED == 1
+    const std::wstring TIR_LUT = L"tm_TIR.bin";
+    const std::wstring FGD_LUT = L"tm_FGD_resample.bin";
 #else
     const std::wstring TIR_LUT = L"tm_TIR.bin";
     const std::wstring FGD_LUT = L"tm_FGD.bin";

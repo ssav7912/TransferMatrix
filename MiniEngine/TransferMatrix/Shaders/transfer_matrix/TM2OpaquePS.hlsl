@@ -166,9 +166,9 @@ float3 eval_lobe(const sample_record rec, const hg_nomean lobe)
     const real3 N = float3(0,0,1);
     const real D = D_GGX_Karis(dot(N, H), rough);
 #endif
-    const float f = G2 * D / (4.0 * rec.incident.z);
+    const float3 f = G2 * D * lobe.norm / (4.0 * rec.incident.z);
         
-    float3 throughput = lobe.norm * f;
+    float3 throughput = f;
 
     
     return throughput;
@@ -206,12 +206,45 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
     
     
     float3 throughput = 0.0;
+    float3 lobe_throughput = 0.0;
+    float3 IBLSamples = 0.0;
     float weight_sum = 0.0;
     //compute lobe weights
     for (int k = 0; k < NumLayers; k++)
     {
         weight_sum += float3_average(lobes[k].norm);
     }
+    
+    //compute PDF separately
+    float pdf = 0.0;
+    {
+        for (int j = 0; j < NumLayers; j++)
+        {
+
+            const float lobe_weight = float3_average(lobes[j].norm);
+            if (lobe_weight > 0.0)
+            {
+                
+            
+                const float rough = hg_to_ggx(lobes[j].asymmetry);
+            
+                float3 incoming = rec.incident;
+                float3 outgoing = rec.outgoing;
+            //incoming.z = abs(incoming.z);
+            //outgoing.z = abs(outgoing.z);
+            
+                const float3 H = float3(0, 0, 1);
+                const float G1 = smithG1(incoming, H, rough);
+                const float D = D_GGX(H, rough);
+            
+                pdf += ((lobe_weight / weight_sum) * (G1 * D / (4.0 * incoming.z)));
+            }
+        }
+
+        
+        pdf = pdf > 0 ? weight_sum / pdf : 0;
+    }
+    
     
     [loop]
     for (int i = 0; i < NumLayers; i++)
@@ -220,7 +253,6 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
         {
             
         
-            float3 lobe_throughput = 0.0f;
             real lobe_weight = float3_average(lobes[i].norm);
             const real rough = hg_to_ggx(lobes[i].asymmetry);
            
@@ -246,7 +278,7 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
             #else
                 const float D = D_GGX_Karis(dot(N, H), rough);
 #endif                
-                lobe_pdf = (lobe_weight * G1 * D / (4.0 * incoming.z)) / weight_sum;
+                lobe_pdf = (lobe_weight * G1 * D / (4.0 * incoming.z));
 
             }
         
@@ -283,7 +315,8 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
                     F0 = fresnelConductorExact(dot(rec.incident, H), ior_01, props.kappas[1] / props.iors[0]);
                 }
 
-                throughput += ((F0 * G2_0 * D0_0 / (4.0 * rec.incident.z)) / lobe_pdf) * TopIBLSample;
+                IBLSamples += TopIBLSample;
+                throughput += ((F0 * G2_0 * D0_0 / (4.0 * rec.incident.z)));
             }
               
              //only evaluate layers when not in air-substrate interface.
@@ -303,17 +336,19 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
                 const float LOD = rough * IBLRange + IBLBias;
                 const float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, lobeOutgoingWS, LOD);
                 //throughput
-                lobe_throughput += eval_lobe(rec, lobes[i]);
+                
+                const float3 individual_lobe = eval_lobe(rec, lobes[i]);
+                throughput += individual_lobe;
             
-            
-                throughput += (lobe_throughput / lobe_pdf) * IBLSample;
+                IBLSamples += IBLSample;
+                
             }
  
         }
     }
     
    
-    return throughput;
+    return ((throughput * pdf) * IBLSamples);
 }
 
 
@@ -348,19 +383,15 @@ float4 main(VSOutput vsOutput) : SV_Target0
    
     float3 output = sample_preintegrated(rec, TangentToWorld, props);
     
-    layer_components_tm2 ops[LAYERS_MAX];
-    components_transfer_factors(rec.incident, props.iors, props.kappas, props.rough, ops);
+    //layer_components_tm2 ops[LAYERS_MAX];
+    //components_transfer_factors(rec.incident, props.iors, props.kappas, props.rough, ops);
     //
-    hg_nomean lobes[LAYERS_MAX];
-    outgoing_lobes(rec.incident, props.iors, props.kappas, props.rough, lobes);
+    //hg_nomean lobes[LAYERS_MAX];
+    //outgoing_lobes(rec.incident, props.iors, props.kappas, props.rough, lobes);
     //
     //output = lobes[NumLayers-1].norm.xxx;
     
-    //float3 output = sample_FGD(0.77, 0.1, 1.0.xxx, float3(1.0, 0.1, 0.1));
-    
-    //float3 output = ops[0].transmission_up.mean;
-	       
-
+    //output = sample_FGD(1, props.rough[NumLayers], props.iors[NumLayers], props.kappas[NumLayers]);
     
     
     return float4(output, 1.0);

@@ -21,8 +21,8 @@ int main()
 
     const float bottomlayerIOR = 1.0;
     const float bottomlayerKappa[3] = { 1.0, 0.1, 0.1 };
-    const float bottomlayerAlpha = 0.1;
-    const float cti = 0.77;
+    const float bottomlayerAlpha = 0.01;
+    const float cti = 1;
     const auto fgd_ref_x = FGD.range_get_interpolate(cti, bottomlayerAlpha, bottomlayerIOR, bottomlayerKappa[0]);
     const auto fgd_ref_y = FGD.range_get_interpolate(cti, bottomlayerAlpha, bottomlayerIOR, bottomlayerKappa[1]);
     const auto fgd_ref_z = FGD.range_get_interpolate(cti, bottomlayerAlpha, bottomlayerIOR, bottomlayerKappa[2]);
@@ -31,8 +31,14 @@ int main()
         bottomlayerKappa[0], bottomlayerKappa[1], bottomlayerKappa[2],
         fgd_ref_x, fgd_ref_y, fgd_ref_z) << std::endl;
 
-
     
+    const auto fgd_ref_zeroIOR_x = FGD.range_get_interpolate(cti, bottomlayerAlpha, 0, bottomlayerKappa[0]);
+    const auto fgd_ref_zeroIOR_y = FGD.range_get_interpolate(cti, bottomlayerAlpha, 0, bottomlayerKappa[1]);
+    const auto fgd_ref_zeroIOR_z = FGD.range_get_interpolate(cti, bottomlayerAlpha, 0, bottomlayerKappa[2]);
+
+    std::cout << std::format("Reference FGD for cti = {0}, alpha = {1}, IOR = {2}, Kappa = [{3},{4},{5}] is [{6},{7},{8}]",
+        cti, bottomlayerAlpha, 0, bottomlayerKappa[0], bottomlayerKappa[1], bottomlayerKappa[2], fgd_ref_zeroIOR_x, fgd_ref_zeroIOR_y, fgd_ref_zeroIOR_z) 
+        << std::endl;
 
 
 }

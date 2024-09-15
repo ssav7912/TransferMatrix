@@ -41,7 +41,7 @@ public:
 	Texture LoadGDLUTFromFile(const std::wstring& GD_path);
 
 	template<size_t LutDimension>
-	static void LoadLUTFromFile(const std::wstring& path, std::vector<float>& data)
+	static void LoadLUTFromFile(const std::wstring& path, std::vector<float>& data, int32_t out_size[LutDimension] = nullptr)
 	{
 		struct range {
 			float min;
@@ -58,6 +58,10 @@ public:
 		for (int i = 0; i < LutDimension; i++)
 		{
 			in.read(reinterpret_cast<char*>(&size[i]), sizeof(int32_t));
+			if (out_size != nullptr)
+			{
+				out_size[i] = size[i];
+			}
 		}
 
 		for (int i = 0; i < LutDimension; i++)

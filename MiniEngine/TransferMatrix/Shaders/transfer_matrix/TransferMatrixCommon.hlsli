@@ -899,7 +899,7 @@ float3 Dim4ToDim3(float4 coord, uint dimension)
 
 real3 sample_FGD(float cti, real alpha, real3 ior, real3 kappa)
 {
-    float3 output = 0.0f.xxx;
+    float3 output = 0.0.xxx;
 #if USE_FAST_FGD == 1
     //FGD 4D LUT parameterised by elevation, roughness and complex IOR
     //(Karis 2013) approximation parameterised by Roughness and angle
@@ -919,14 +919,14 @@ real3 sample_FGD(float cti, real alpha, real3 ior, real3 kappa)
     static const uint DimensionZ = DimensionXY * 32;
     static const uint DimensionW = 32;
     
-    static const float DimensionXMin = 0.0f;
-    static const float DimensionXMax = 1.0f;
-    static const float DimensionYMin = 0.0f;
-    static const float DimensionYMax = 1.0f;
-    static const float DimensionZMin = 0.0f;
-    static const float DimensionZMax = 4.0f;
-    static const float DimensionWMin = 0.0f;
-    static const float DimensionWMax = 4.0f;
+    static const float DimensionXMin = 0.0;
+    static const float DimensionXMax = 1.0;
+    static const float DimensionYMin = 0.0;
+    static const float DimensionYMax = 1.0;
+    static const float DimensionZMin = 0.0;
+    static const float DimensionZMax = 4.0;
+    static const float DimensionWMin = 0.0;
+    static const float DimensionWMax = 4.0;
     
    
     //remap ranges to 0-1 normalised index.
@@ -936,22 +936,24 @@ real3 sample_FGD(float cti, real alpha, real3 ior, real3 kappa)
     //remap Z & W index from being within [0,64] range to [0,2048]
     //Z index is normalised [0,64] range stretched to [0,2048]
     const float3 ior_norm = (ior - DimensionZMin) / (DimensionZMax - DimensionZMin);
-    const float3 ior_index = saturate((trunc(ior_norm * (DimensionXY - 1)) / (DimensionXY - 1)));
+    
+    const float3 ior_index = (ior_norm * (DimensionZ - 1));
     
     //W index is normalised [0,32] range + Z index.
     const float3 kappa_norm = (kappa - DimensionWMin) / (DimensionWMax - DimensionWMin);
-    const float3 kappa_index = saturate((trunc(kappa_norm * (DimensionW - 1)) / (DimensionW - 1)) / (DimensionZ - 1));
+    
+    const float3 kappa_index = (kappa_norm * (DimensionW - 1));
    
-    const float3 ZIndex = saturate(ior_index + kappa_index);
+    const float3 ZIndex = (ior_index + kappa_index) / (DimensionZ - 1);
+
     
     //4D LUT is packed into 3D Texture, z & w share the same dimension. 
-    //since it's normalised, need to reproduce the power.
     output.x = FGD_LUT.Sample(LUTSampler, float3(cti_index, alpha_index, ZIndex.x));
     output.y = FGD_LUT.Sample(LUTSampler, float3(cti_index, alpha_index, ZIndex.y));
     output.z = FGD_LUT.Sample(LUTSampler, float3(cti_index, alpha_index, ZIndex.z));
 #endif
     
-    return output; // float3(cti_index * (DimensionXY - 1), alpha_index * (DimensionXY - 1), ZIndex.x * (DimensionZ - 1))
+    return output;
 }
 
 //could i just reuse the FGD LUT for this?

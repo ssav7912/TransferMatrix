@@ -60,6 +60,7 @@ public:
 
     virtual void Update( float deltaT ) override;
     virtual void RenderScene( void ) override;
+    virtual void RenderUI(GraphicsContext& UIcontext) override;
 
 private:
 
@@ -479,16 +480,22 @@ void ModelViewer::RenderScene( void )
     gui.LayerUI(std::max(0,std::min(TransferMatrixResources::MAX_LAYERS -1, gui.NumLayers)), TransferMatrixResources::MAX_LAYERS - 1); //-1 to account for the external media.
 
 
-    ImGui::Render();
-    auto cmdlist = gfxContext.GetCommandList();
    
+    gfxContext.Finish();
+}
+
+void ModelViewer::RenderUI(GraphicsContext& UIcontext)
+{
+   //UI rendering.
+    ImGui::Render();
+    auto cmdlist = UIcontext.GetCommandList();
 
 
-    gfxContext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
-    gfxContext.SetRenderTarget(Graphics::g_SceneColorBuffer.GetRTV());
-    gfxContext.SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, gui.FontHeap.GetHeapPointer());
+
+    UIcontext.TransitionResource(g_SceneColorBuffer, D3D12_RESOURCE_STATE_RENDER_TARGET, true);
+    UIcontext.SetRenderTarget(Graphics::g_SceneColorBuffer.GetRTV());
+    UIcontext.SetDescriptorHeap(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, gui.FontHeap.GetHeapPointer());
     ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cmdlist);
     ImGui::EndFrame();
 
-    gfxContext.Finish();
 }

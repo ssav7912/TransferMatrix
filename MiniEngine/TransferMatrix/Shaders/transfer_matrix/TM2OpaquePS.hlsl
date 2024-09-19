@@ -184,10 +184,7 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
     const float3 H = float3(0.f, 0.f, 1.f); //mirror reflection about normal, 
             //as using preintegrated lighting.
     
-
-    
-    
-    
+        
     //get the outgoing lobes
     hg_nomean lobes[LAYERS_MAX];
     outgoing_lobes(rec.outgoing, props.iors, props.kappas, props.rough, lobes);
@@ -216,7 +213,7 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
     }
     
     //compute PDF separately
-    float pdf = 0.0;
+        float pdf = 0.0;
     {
         for (int j = 0; j < NumLayers; j++)
         {
@@ -321,7 +318,7 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
                     F0 = fresnelConductorExact(dot(rec.incident, H), ior_01, props.kappas[1] / props.iors[0]);
                 }
 
-                IBLSamples += TopIBLSample;
+                IBLSamples += (TopIBLSample / (float) NumLayers);
                 throughput += ((F0 * G2_0 * D0_0/ (4.0 * rec.incident.z)));
             }
               
@@ -346,7 +343,7 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
                 const float3 individual_lobe = eval_lobe(rec, lobes[i]);
                 throughput += individual_lobe;
             
-               IBLSamples += IBLSample;
+                IBLSamples += (IBLSample / (float) NumLayers);
                 
             }
  
@@ -373,13 +370,16 @@ float4 main(VSOutput vsOutput) : SV_Target0
     const float3 incident = cartesianTSToMitsubaLS(mul(WorldToTangent, ViewerRay));
     const float3 outgoing = reflectSpherical(incident, float3(0., 0., 1.0)); //reflect about H
     
+    
+    
+    
     sample_record rec =
     {
         //feel like there's something wrong with the CRS i'm providing,
         //but I don't know what.
         incident,
         outgoing,
-        1.0f,
+        1.0,
         true,
         TM_SAMPLE_TYPE_GLOSSY_REFLECTION
     };

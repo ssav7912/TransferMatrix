@@ -166,9 +166,9 @@ float3 eval_lobe(const sample_record rec, const hg_nomean lobe)
     const real3 N = float3(0,0,1);
     const real D = D_GGX_Karis(dot(N, H), rough);
 #endif
-    const float3 f = G2 * D * lobe.norm / (4.0 * rec.incident.z);
+    const float3 f = (G2 * D) / (4.0 * rec.incident.z);
         
-    float3 throughput = f;
+    float3 throughput = lobe.norm * f;
 
     
     return throughput;
@@ -230,20 +230,22 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
             
                 float3 incoming = rec.incident;
                 float3 outgoing = rec.outgoing;
-            //incoming.z = abs(incoming.z);
-            //outgoing.z = abs(outgoing.z);
+
             
                 const float3 H = float3(0, 0, 1);
+#if SCHLICK_G == 1
+                const float G1 = SchlickG1(incoming, rough);
+#else
                 const float G1 = smithG1(incoming, H, rough);
+                
+#endif
                 const float D = D_GGX(H, rough);
             
                 pdf += ((lobe_weight / weight_sum) * (G1 * D / (4.0 * incoming.z)));
             }
         }
-
-        
-        pdf = pdf > 0 ? weight_sum / pdf : 0;
     }
+    
     
     
     [loop]
@@ -272,13 +274,17 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
                 outgoing.z = abs(outgoing.z);
             
                 const float3 H = normalize(incoming + outgoing);
+#if defined(SCHLICK_G) && SCHLICK_G == 1
+                const float G1 = SchlickG1(incoming, rough);          
+#else
                 const float G1 = smithG1(incoming, H, rough);
+#endif
 #if !defined(USE_D_KARIS) || USE_D_KARIS == 0
                 const float D = D_GGX(H, rough);
             #else
                 const float D = D_GGX_Karis(dot(N, H), rough);
 #endif                
-                lobe_pdf = (lobe_weight * G1 * D / (4.0 * incoming.z));
+                lobe_pdf = ((lobe_weight / weight_sum) * G1 * D / (4.0 * incoming.z));
 
             }
         
@@ -316,7 +322,7 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
                 }
 
                 IBLSamples += TopIBLSample;
-                throughput += ((F0 * G2_0 * D0_0 / (4.0 * rec.incident.z)));
+                throughput += ((F0 * G2_0 * D0_0/ (4.0 * rec.incident.z)));
             }
               
              //only evaluate layers when not in air-substrate interface.
@@ -340,7 +346,7 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
                 const float3 individual_lobe = eval_lobe(rec, lobes[i]);
                 throughput += individual_lobe;
             
-                IBLSamples += IBLSample;
+               IBLSamples += IBLSample;
                 
             }
  
@@ -348,7 +354,7 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
     }
     
    
-    return ((throughput * pdf) * IBLSamples);
+    return safe_div(throughput, pdf) * IBLSamples;
 }
 
 
@@ -391,7 +397,7 @@ float4 main(VSOutput vsOutput) : SV_Target0
     //
     //output = lobes[NumLayers-1].norm.xxx;
     
-    //output = sample_FGD(1, props.rough[NumLayers], props.iors[NumLayers], props.kappas[NumLayers]);
+    //output = sample_FGD(incident.z, props.rough[NumLayers], props.iors[NumLayers], props.kappas[NumLayers]);
     
     
     return float4(output, 1.0);

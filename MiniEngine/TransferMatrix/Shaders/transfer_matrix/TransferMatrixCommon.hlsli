@@ -613,7 +613,27 @@ float3 sample_GGX(float2 sample, float alpha, out float pdf)
     return float3(sinThetaM * cosPhiM, sinThetaM * sinPhiM, cosThetaM);
 }
 
-real smithG1(real NdotV, real alpha)
+
+
+//Karis [2013]
+float SchlickG1(float3 v, float alpha)
+{
+    float k = ((alpha + 1) * (alpha + 1) / 8);
+    float3 N = float3(0, 0, 1);
+    float NdotV = saturate(dot(N, v));
+    
+    return NdotV / (NdotV * (1 - k) + k);
+    
+}
+
+
+float SchlickG2(float3 l, float3 v, float3 h, float alpha)
+{
+    return SchlickG1(l, alpha) * SchlickG1(v, alpha);
+
+}
+
+float smithG1(float NdotV, float alpha)
 {
     real a2 = alpha * alpha;
     return 2.0 / (1.0 + sqrt(1.0 + a2 * (1.0 - NdotV * NdotV)) / (NdotV * NdotV));
@@ -637,7 +657,7 @@ min16float smithG1(min16float3 v, min16float3 m, min16float alpha)
     
     min16float root = alpha * tantheta;
                     //hypot2
-    return saturate(2.0 / (1.0 + 1.0 * 1.0 + root * root));
+    return (2.0 / (1.0 + 1.0 * 1.0 + root * root));
 
 }
 
@@ -661,7 +681,7 @@ float smithG1(float3 v, float3 m, float alpha)
     
     float root = alpha * tantheta;
                     //hypot2
-    return saturate(2.0 / (1.0 + 1.0 * 1.0 + root * root));
+    return (2.0 / (1.0 + 1.0 * 1.0 + root * root));
 
 }
 
@@ -792,15 +812,9 @@ float3 sample_GGX_Visible(float3 incident, float2 samplePoint, float rough, out 
 }
 
 //Karis 2013 distribution.
-min16float D_GGX_Karis(min16float NdotH, min16float rough)
-{
-    min16float rough_square = rough * rough;
-    min16float f = (NdotH * NdotH) * (rough_square - 1.0) + 1.0;
-    return rough_square / (HALF_PI * f * f);
-}
-
 float D_GGX_Karis(float NdotH, float rough)
 {
+    rough = max(EPSILON, rough);
     float rough_square = rough * rough;
     float f = (NdotH * NdotH) * (rough_square - 1.0) + 1.0;
     return rough_square / (PI * f * f);

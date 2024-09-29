@@ -53,7 +53,14 @@ float henyey_greenstein_phase_function(float theta, float g)
 
 ///Equation 15
 ///Translates ggx roughness param to henyey greenstein asymmetry param.
-real ggx_to_hg(real rough)
+min10float ggx_to_hg(min16float rough)
+{
+    rough = saturate(rough);
+    return saturate(-0.085 + ((1.085) / (1.0 + pow((rough / 0.5), 1.3))));
+
+}
+
+real ggx_to_hg(float rough)
 {
     rough = saturate(rough);
     return saturate(-0.085 + ((1.085) / (1.0 + pow((rough / 0.5), 1.3))));
@@ -71,38 +78,3 @@ real hg_refract(real asymmetry, real ior)
 {
     return min(sqrt(max(1.0 - (1.0 - asymmetry * asymmetry) * pow(ior, 0.75), 0.0)), 1.0);
 }
-
-//equation 16
-//@param g_i incoming light distribution with asymmetry g_i
-//@param rough roughness of dielectric interface.
-float dielectric_reflected_asymmetry(float g_i, float rough)
-{
-    return clamp(g_i, -1.0f, 1.0f) * ggx_to_hg(rough);
-}
-
-///Equation 9. 
-///Belcour scaling factor.
-///n = refractive_index = refractive index of what? 
-float fake_rough_scaling(float refractive_index, float theta_i, float theta_t)
-{
-    return (1.0f / 2.0f) * (1.0f + refractive_index * (cos(theta_i) / cos(theta_t)));
-}
-
-///Equation 18.
-///@param g_i asymmetry parameter of incident phase function.
-///@param rough roughness of inicident interface.
-///@param n_i refractive index of incident media.
-///@param n_t refractive index of transmitted media.
-float dielectric_transmited_asymmetry(float g_i, float rough, float n_i, float n_t, float theta_i, float theta_t, float ior)
-{
-    //equation 17.
-    const float t = (1.0f - g_i * g_i) * pow((n_i / n_t), 3.0f / 4.0f);
-    const float h = sqrt(1.0f - max(0, min(t, 1.0f)));
-    
-    //belcour fake scaling factor equation 9.
-
-    const float s = fake_rough_scaling(ior, theta_i, theta_t);
-    
-    return h * ggx_to_hg(s * rough);
-}
-

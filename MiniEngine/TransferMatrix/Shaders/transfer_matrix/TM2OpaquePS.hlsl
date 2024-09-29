@@ -195,10 +195,7 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
 
 
     
-    if (rec.outgoing.z <= 0.0f)
-    {
-        return EVAL_DEBUG;
-    }
+
     
     
     
@@ -229,7 +226,6 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
                 float3 outgoing = rec.outgoing;
 
             
-                const float3 H = float3(0, 0, 1);
 #if SCHLICK_G == 1
                 const float G1 = SchlickG1(incoming, rough);
 #else
@@ -238,9 +234,10 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
 #endif
                 const float D = D_GGX(H, rough);
             
-                pdf += ((lobe_weight / weight_sum) * (G1 * D / (4.0 * incoming.z)));
+                pdf += ((lobe_weight) * (G1 * D / (4.0 * incoming.z)));
             }
         }
+        pdf = safe_div(pdf, weight_sum);
     }
     
     
@@ -258,45 +255,20 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
      
             rec.ior = 1.0f;
             rec.is_reflection_sample = false;
-            rec.sample_type = TM_SAMPLE_TYPE_GLOSSY_REFLECTION;
-        
-        
-        //pdf
-            float lobe_pdf = 0.0;
-            {
-            
-                float3 incoming = rec.incident;
-                float3 outgoing = rec.outgoing;
-                incoming.z = abs(incoming.z);
-                outgoing.z = abs(outgoing.z);
-            
-                const float3 H = normalize(incoming + outgoing);
-#if defined(SCHLICK_G) && SCHLICK_G == 1
-                const float G1 = SchlickG1(incoming, rough);          
-#else
-                const float G1 = smithG1(incoming, H, rough);
-#endif
-#if !defined(USE_D_KARIS) || USE_D_KARIS == 0
-                const float D = D_GGX(H, rough);
-            #else
-                const float D = D_GGX_Karis(dot(N, H), rough);
-#endif                
-                lobe_pdf = ((lobe_weight / weight_sum) * G1 * D / (4.0 * incoming.z));
-
-            }
-        
+            rec.sample_type = TM_SAMPLE_TYPE_GLOSSY_REFLECTION;        
         
             if (i == 0)
             {
                 
                 //top reflection correction. [Bati 2019]
                 const real TopRough = props.rough[1];
-#if !defined(USE_EARL_G2) || USE_EARL_G2 == 0
-                const real G2_0 = smithG(rec.incident, rec.outgoing, H, TopRough);
-#else
-                const real G2_0 = smithG2(rec.outgoing, H, rec.incident, TopRough);
-#endif
                 const float3 TopLobeOutgoing = specular_dominant(H, rec.outgoing, dot(H, rec.incident), TopRough);
+                const float3 H_adjusted = normalize(rec.incident + TopLobeOutgoing);
+#if !defined(USE_EARL_G2) || USE_EARL_G2 == 0
+                const real G2_0 = smithG(rec.incident, TopLobeOutgoing, H, TopRough);
+#else
+                const real G2_0 = smithG2(TopLobeOutgoing, H_adjusted, rec.incident, TopRough);
+#endif
                 
                 const float3 topOutgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(TopLobeOutgoing));
                 const float BottomLOD = TopRough * IBLRange + IBLBias;
@@ -305,7 +277,7 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
 #if !defined(USE_D_KARIS) || USE_D_KARIS == 0
                 const real D0_0 = D_GGX(H, TopRough);
 #else
-                const real D0_0 = D_GGX_Karis(dot(N, H), rough);
+                const real D0_0 = D_GGX_Karis(dot(N, H_adjusted), rough);
 #endif
                 real3 F0 = 0.0.xxx;
                 const real3 ior_01 = props.iors[1] / props.iors[0];
@@ -326,13 +298,14 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
             if (i >= 1)
             {
                 
-                
+                  const float3 lobeOutgoing = specular_dominant(H, rec.outgoing, dot(H, rec.incident), rough);
+
 #if !defined(USE_EARL_G2) || USE_EARL_G2 == 0
+
                 const float G = smithG(rec.incident, rec.outgoing, H, rough);
 #else
                 const float G = smithG2(rec.outgoing, H, rec.incident, rough);
 #endif
-                const float3 lobeOutgoing = specular_dominant(H, rec.outgoing, dot(H, rec.incident), rough);
                 
                 const float3 lobeOutgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(lobeOutgoing));
                 
@@ -387,7 +360,8 @@ float4 main(VSOutput vsOutput) : SV_Target0
     
     LayerProperties props = truncate_layer_parameters();
    
-    float3 output = sample_preintegrated(rec, TangentToWorld, props);
+    //float3 output = sample_preintegrated(rec, TangentToWorld, props);
+    float3 output = 0.0.xxx;
     
     //layer_components_tm2 ops[LAYERS_MAX];
     //components_transfer_factors(rec.incident, props.iors, props.kappas, props.rough, ops);
@@ -398,6 +372,12 @@ float4 main(VSOutput vsOutput) : SV_Target0
     //output = lobes[NumLayers-1].norm.xxx;
     
     //output = sample_FGD(incident.z, props.rough[NumLayers], props.iors[NumLayers], props.kappas[NumLayers]);
+    layer_components_tm2 ops[LAYERS_MAX];
+    components_transfer_factors(rec.incident, props.iors, props.kappas, props.rough, ops);
+    for (int i = 0; i < NumLayers; i++)
+    {
+        output += ops[i].reflection_down.norm;
+    }
     
     
     return float4(output, 1.0);

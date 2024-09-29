@@ -261,7 +261,7 @@ float float3_max(float3 v)
     return max(v.x, max(v.y, v.z));
 }
 
-float float3_average(real3 f)
+real float3_average(real3 f)
 {
     
     return (f.x + f.y + f.z) / 3.0;
@@ -290,35 +290,32 @@ float3 reflectSpherical(float3 incident, float3 normal)
     return 2 * dot(incident, normal) * normal - incident;
 }
 
-//min16float3 reflectZ(min16float3 f)
-//{
-//    return min16float3(-f.xy, f.z);
-//}
+min16float3 reflectZ(min16float3 f)
+{
+    return min16float3(-f.xy, f.z);
+}
 
 float3 reflectZ(float3 f)
 {
     return float3(-f.xy, f.z);
 }
 
-//min16float3 refractZ(min16float3 f, min16float ior)
-//{
-//    return refract(f, min16float3(0.0, 0.0, copy_sign(1.0, f.z)), ior);
-//}
 
-float3 refractMitsuba(float3 wi, float3 n, float ior)
+
+float3 refractMitsuba(real3 wi, real3 n, real ior)
 {
-    if (ior == 1)
+    if (ior == 1.0)
     {
         return -wi;
     }
     
-    float cosThetaI = dot(wi, n);
+    real cosThetaI = dot(wi, n);
     if (cosThetaI > 0)
     {
         ior = 1 / ior;
     }
     
-    float cosThetaTsqr = 1 - (1 - cosThetaI * cosThetaI) * (ior * ior);
+    real cosThetaTsqr = 1 - (1 - cosThetaI * cosThetaI) * (ior * ior);
     
     if (cosThetaTsqr <= 0.0)
     {
@@ -328,9 +325,11 @@ float3 refractMitsuba(float3 wi, float3 n, float ior)
     return n * (cosThetaI * ior - sign(cosThetaI) * sqrt(cosThetaTsqr)) - wi * ior;
 }
 
-float3 refractZ(float3 f, float ior)
+
+
+real3 refractZ(real3 f, real ior)
 {
-    return refractMitsuba(f, float3(0.0f, 0.0f, copy_sign(1.0f, f.z)), ior);
+    return refractMitsuba(f, float3(0.0, 0.0, copy_sign(1.0, f.z)), ior);
 
 }
 
@@ -513,17 +512,17 @@ min16float fresnelDielectric(min16float incidentCosTheta, min16float ior)
 float fresnelDielectric(float incidentCosTheta, float ior)
 {
     float transmittedCosTheta;
-    if (ior == 1.0f)
+    if (ior == 1.0)
     {
-        return 0.0f;
+        return 0.0;
     }
     
-    float scale = (incidentCosTheta > 0) ? 1.0f / ior : ior;
-    float transmittedcosTheta2 = 1.0f - (1.0f - incidentCosTheta * incidentCosTheta) * (scale * scale);
+    float scale = (incidentCosTheta > 0) ? 1.0 / ior : ior;
+    float transmittedcosTheta2 = 1.0 - (1.0 - incidentCosTheta * incidentCosTheta) * (scale * scale);
     
-    if (transmittedcosTheta2 <= 0.0f)
+    if (transmittedcosTheta2 <= 0.0)
     {
-        return 1.0f;
+        return 1.0;
     }
     
     incidentCosTheta = abs(incidentCosTheta);
@@ -532,7 +531,7 @@ float fresnelDielectric(float incidentCosTheta, float ior)
     float Rs = (incidentCosTheta - ior * transmittedCosTheta) / (incidentCosTheta + ior * transmittedCosTheta);
     float Rp = (ior * incidentCosTheta - transmittedCosTheta) / (ior * incidentCosTheta + transmittedCosTheta);
     
-    return 0.5f * (Rs * Rs + Rp * Rp);
+    return 0.5 * (Rs * Rs + Rp * Rp);
 }
 
 
@@ -718,99 +717,6 @@ float D_GGX(float3 m, float alpha)
 
 }
 
-float3 sample_GGX_Visible(float3 incident, float2 samplePoint, float rough, out float pdf)
-{
-    float3 incident_weighted = normalize(float3(rough * incident.x, rough * incident.y, incident.z));
-    
-    float theta = 0.0f;
-    float phi = 0.0f;
-    
-    if (incident.z < 0.99999f)
-    {
-        theta = acos(incident_weighted.z);
-        phi = atan2(incident_weighted.y, incident_weighted.x);
-    }
-    
-    float sinphi;
-    float cosphi;
-    
-    sincos(phi, sinphi, cosphi);
-    float2 slope;
-    //sample visible
-    {
-        static const float SQRT_PI_INV = 1.0f / sqrt(PI);
-        
-        if (theta < 1e-4f)
-        {
-            float sinphi = 0.0f;
-            float cosphi = 0.0f;
-            
-            float r = sqrt(samplePoint.x / (1 - samplePoint.x)); //TODO: safe sqrt
-            sincos(2 * PI * samplePoint.y, sinphi, cosphi);
-            slope = float2(r * cosphi, r * sinphi);
-        }
-        
-        float tantheta = tan(theta);
-        float a = 1 / tantheta;
-        float G1 = 2.0f / (1.0f + sqrt(1.0f + 1.0f / (a * a)));
-        
-        float A = 2.0f * samplePoint.x / G1 - 1.0f;
-        if( abs(A) == 1.0f)
-        {
-            A -= sign(A) * EPSILON;
-        }
-        float tmp = 1.0f / (A * A - 1.0f);
-        float B = tantheta;
-        float D = sqrt(B * B * tmp * tmp - (A * A - B * B) * tmp);
-        float slope_x_1 = B * tmp - D;
-        float slope_X_2 = B * tmp + D;
-        
-        slope.x = (A < 0.0f || slope_X_2 > 1.0f / tantheta) ? slope_x_1 : slope_X_2;
-        
-        float S = 0.0f;
-        if (samplePoint.y > 0.5f)
-        {
-            S = 1.0f;
-            samplePoint.y = 2.0f * (samplePoint.y - 0.5f);
-        }
-        else
-        {
-            S = -1.0f;
-            samplePoint.y = 2.0f * (0.5f - samplePoint.y);
-        }
-        
-        float z = (samplePoint.y * (samplePoint.y * (samplePoint.y * (-0.365728915865723f) + 0.790235037209296f) -
-                            0.424965825137544f) + 0.000152998850436920f) /
-                        (samplePoint.y * (samplePoint.y * (samplePoint.y * (samplePoint.y * 0.169507819808272f - 0.397203533833404f) -
-                            0.232500544458471f) + 1.0f) - 0.539825872510702f);
-
-        slope.y = S * z * sqrt(1.0f + slope.x * slope.x);
-    }
-    
-    //pdf
-    {
-        if (incident.z == 0.0f)
-        {
-            pdf = 0.0f;
-        }
-        else
-        {
-            static const float3 M = float3(0.0f, 0.0f, 1.0f);
-            pdf = smithG1(incident, M, rough) * abs(dot(incident, M) * D_GGX(M, rough)) / abs(incident.z);
-        }
-    }
-    
-    slope = float2(cosphi * slope.x - sinphi * slope.y,
-                    sinphi * slope.x + cosphi * slope.y);
-    
-    slope.x *= rough;
-    slope.y *= rough;
-    
-    float norm = 1.0f / sqrt(slope.x * slope.x + slope.y * slope.y + 1.0f);
-
-    return float3(-slope.x * norm, -slope.y * norm, norm);
-}
-
 //Karis 2013 distribution.
 float D_GGX_Karis(float NdotH, float rough)
 {
@@ -911,7 +817,7 @@ float3 Dim4ToDim3(float4 coord, uint dimension)
     return float3(coord.x, coord.y, coord.z + (coord.w * dimension));
 }
 
-real3 sample_FGD(float cti, real alpha, real3 ior, real3 kappa)
+real3 sample_FGD(real cti, real alpha, real3 ior, real3 kappa)
 {
     float3 output = 0.0.xxx;
 #if USE_FAST_FGD == 1
@@ -944,21 +850,21 @@ real3 sample_FGD(float cti, real alpha, real3 ior, real3 kappa)
     
    
     //remap ranges to 0-1 normalised index.
-    const float cti_index = saturate((cti - DimensionXMin) / (DimensionXMax - DimensionXMin));
-    const float alpha_index =  saturate((alpha - DimensionYMin) / (DimensionYMax - DimensionYMin));
+    const real cti_index = saturate((cti - DimensionXMin) / (DimensionXMax - DimensionXMin));
+    const real alpha_index =  saturate((alpha - DimensionYMin) / (DimensionYMax - DimensionYMin));
     
     //remap Z & W index from being within [0,64] range to [0,2048]
     //Z index is normalised [0,64] range stretched to [0,2048]
-    const float3 ior_norm = (ior - DimensionZMin) / (DimensionZMax - DimensionZMin);
+    const real3 ior_norm = (ior - DimensionZMin) / (DimensionZMax - DimensionZMin);
     
-    const float3 ior_index = (ior_norm * (DimensionZ - 1));
+    const real3 ior_index = (ior_norm * (DimensionZ - 1));
     
     //W index is normalised [0,32] range + Z index.
-    const float3 kappa_norm = (kappa - DimensionWMin) / (DimensionWMax - DimensionWMin);
+    const real3 kappa_norm = (kappa - DimensionWMin) / (DimensionWMax - DimensionWMin);
     
-    const float3 kappa_index = (kappa_norm * (DimensionW - 1));
+    const real3 kappa_index = (kappa_norm * (DimensionW - 1));
    
-    const float3 ZIndex = (ior_index + kappa_index) / (DimensionZ - 1);
+    const real3 ZIndex = (ior_index + kappa_index) / (DimensionZ - 1);
 
     
     //4D LUT is packed into 3D Texture, z & w share the same dimension. 
@@ -978,7 +884,7 @@ float sample_GD(float cti, float rough)
 
 
 
-void albedos(float cti, real alpha, real ior_ij, out real3 r_ij, out real3 t_ij, out real3 r_ji, out real3 t_ji)
+void albedos(real cti, real alpha, real ior_ij, out real3 r_ij, out real3 t_ij, out real3 r_ji, out real3 t_ji)
 {
     if (abs(ior_ij - 1.0) < 1e-3)
     {
@@ -1004,7 +910,7 @@ void albedos(float cti, real alpha, real ior_ij, out real3 r_ij, out real3 t_ij,
 
 
 
-void albedo(float cti, real alpha, real3 ior_ij, real3 kappa_ij, out real3 r_ij)
+void albedo(real cti, real alpha, real3 ior_ij, real3 kappa_ij, out real3 r_ij)
 {
     //can't be negative! 
     

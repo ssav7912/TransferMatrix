@@ -68,21 +68,21 @@ tensor3d6x6 energy_matrix(layer_components_tm6 ops)
     
     if (ops.type == TM_TYPE_DIELECTRICINTERFACE)
     {
-        energy._11 = 1.0f.xxx / ops.interface_type.transmission_down.norm;
+        energy._11 = 1.0.xxx / ops.interface_type.transmission_down.norm;
         energy._12 = -ops.interface_type.reflection_down.norm * energy._11;
         energy._21 = ops.interface_type.reflection_down.norm * energy._11;
         energy._22 = -ops.interface_type.reflection_down.norm * ops.interface_type.reflection_up.norm * energy._11 + ops.interface_type.transmission_up.norm;
         
-        energy._33 = 1.0f.xxx / ops.interface_type.transmission_down_secondary.norm;
+        energy._33 = 1.0.xxx / ops.interface_type.transmission_down_secondary.norm;
         energy._34 = -ops.interface_type.reflection_up_secondary.norm * energy._33;
         energy._43 = ops.interface_type.reflection_down_secondary.norm * energy._33;
         energy._44 = -ops.interface_type.reflection_down_secondary.norm * ops.interface_type.reflection_up.norm * energy._33 + ops.interface_type.transmission_up_secondary.norm;
     }
     else if (ops.type == TM_TYPE_HOMOGENOUSMEDIUM)
     {
-        energy._11 = 1.0f.xxx / ops.media_type.primary_flux_transmission.norm;
+        energy._11 = 1.0.xxx / ops.media_type.primary_flux_transmission.norm;
         energy._22 = ops.media_type.primary_flux_transmission.norm;
-        energy._33 = 1.0f.xxx / ops.media_type.secondary_flux_forward_transmission.norm;
+        energy._33 = 1.0.xxx / ops.media_type.secondary_flux_forward_transmission.norm;
         energy._44 = -(ops.media_type.secondary_flux_backward_reflection.norm * ops.media_type.secondary_flux_backward_reflection.norm) * energy._33 + ops.media_type.secondary_flux_forward_transmission.norm;
         energy._52 = energy._36 - ops.media_type.secondary_flux_backward_reflection.norm * energy._33;
         energy._31 = energy._33 - energy._11;
@@ -228,10 +228,10 @@ void dielectric_transfer_factors(float3 incident, real ior_ij, real rough, out l
     s_t_ij = abs((ior_ji * ops.interface_type.reflection_down.mean.z + ops.interface_type.reflection_up.mean.z) / ops.interface_type.reflection_up.mean.z);
     s_t_ji = abs((ior_ij * ops.interface_type.reflection_up.mean.z + ops.interface_type.reflection_down.mean.z) / ops.interface_type.reflection_down.mean.z);
     
-    ops.interface_type.transmission_down.asymmetry = ggx_to_hg(0.5f * s_t_ij * rough);
+    ops.interface_type.transmission_down.asymmetry = ggx_to_hg(0.5 * s_t_ij * rough);
     ops.interface_type.transmission_down.mean = ops.interface_type.reflection_up.mean;
     
-    ops.interface_type.transmission_up.asymmetry = ggx_to_hg(0.5f * s_t_ji * rough);
+    ops.interface_type.transmission_up.asymmetry = ggx_to_hg(0.5 * s_t_ji * rough);
     ops.interface_type.transmission_up.mean = ops.interface_type.reflection_down.mean;
     
     albedos(abs(incident.z), rough, ior_ij, ops.interface_type.reflection_down.norm, ops.interface_type.transmission_down.norm, ops.interface_type.reflection_up.norm, ops.interface_type.transmission_up.norm);
@@ -318,7 +318,6 @@ void components_transfer_factors_tm6(float3 incident, LayerProperties props, out
     
     for (int i = 0; i < NumLayers; i++)
     {
-        ops[i] = ops_zero_init();
         ior_ij = props.iors[i + 1] / props.iors[i];
         
         if (isZero(props.kappas[i + 1]))
@@ -402,7 +401,7 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
         }
         else if (ops[c].type == TM_TYPE_DIELECTRICINTERFACE)
         {
-            const int i = c / 2.0; //hmmm
+            const int i = c >> 1; //hmmm
             ior_ij = float3_average((props.iors[i + 1] / props.iors[i]));
             ior_ji = 1.0f / ior_ij;
             
@@ -426,25 +425,38 @@ int outgoing_lobes(float3 incident, LayerProperties props, out henyey_greenstein
             //simplification? drop TIR correction?
             if (ior_ij < 1.0)
             {
+#if !defined(ANALYTIC_TIR) || ANALYTIC_TIR == 0
                 TIR_norm = TIR_lookup(float3(abs(ops[c].interface_type.reflection_down.mean.z), hg_to_ggx(asymmetry_T_0i), ior_ij)) * ops[c].interface_type.transmission_down.norm;
-                
+#else
+                TIR_norm = TIR_analytical(abs(ops[c].interface_type.reflection_down.mean.z), hg_to_ggx(asymmetry_T_0i), ior_ij, 1.0/float3_average(props.iors[c])) * ops[c].interface_type.transmission_down.norm;
+#endif
                 ops[c].interface_type.reflection_down.norm += TIR_norm;
                 ops[c].interface_type.transmission_down.norm -= TIR_norm;
 
+#if !defined(ANALYTIC_TIR) || ANALYTIC_TIR == 0
                 TIR_norm = TIR_lookup(float3(abs(ops[c].interface_type.reflection_down_secondary.mean.z), hg_to_ggx(asymmetry_s_T_0i), ior_ij)) * ops[c].interface_type.transmission_down_secondary.norm;
-                
+#else
+                TIR_norm = TIR_analytical(abs(ops[c].interface_type.reflection_down_secondary.mean.z), hg_to_ggx(asymmetry_s_T_0i), ior_ij, 1.0/float3_average(props.iors[c])) * ops[c].interface_type.transmission_down_secondary.norm;
+#endif
                 ops[c].interface_type.reflection_down_secondary.norm += TIR_norm;
                 ops[c].interface_type.transmission_down_secondary.norm += TIR_norm;
             }
             else
             {
-                TIR_norm = TIR_lookup(float3(abs(ops[c].interface_type.transmission_down.mean.z), hg_to_ggx(asymmetry_T_0j_R), ior_ji)) * ops[c].interface_type.transmission_up.norm;
                 
+#if !defined(ANALYTIC_TIR) || ANALYTIC_TIR == 0
+                TIR_norm = TIR_lookup(float3(abs(ops[c].interface_type.transmission_down.mean.z), hg_to_ggx(asymmetry_T_0j_R), ior_ji)) * ops[c].interface_type.transmission_up.norm;
+#else
+                TIR_norm = TIR_analytical(abs(ops[c].interface_type.transmission_down.mean.z), hg_to_ggx(asymmetry_T_0j_R), ior_ji,  1.0/float3_average(props.iors[c + 1])) * ops[c].interface_type.transmission_up.norm; 
+#endif
                 ops[c].interface_type.reflection_up.norm += TIR_norm;
                 ops[c].interface_type.transmission_up.norm -= TIR_norm;
                 
+#if !defined(ANALYTIC_TIR) || ANALYTIC_TIR == 0
                 TIR_norm = TIR_lookup(float3(abs(ops[c].interface_type.transmission_down_secondary.mean.z), hg_to_ggx(asymmetry_s_T_0j_R), ior_ji)) * ops[c].interface_type.transmission_up_secondary.norm;
-                
+#else
+                TIR_norm = TIR_analytical(abs(ops[c].interface_type.transmission_down_secondary.mean.z), hg_to_ggx(asymmetry_s_T_0j_R), ior_ji, 1.0/float3_average(props.iors[c + 1])) * ops[c].interface_type.transmission_up_secondary.norm;
+#endif
                 ops[c].interface_type.reflection_up_secondary.norm += TIR_norm;
                 ops[c].interface_type.transmission_up_secondary.norm -= TIR_norm;
                 
@@ -536,12 +548,21 @@ float3 eval_lobe(float3 incident, float3 outgoing, henyey_greenstein lobe)
 {
     float3 H = normalize(incident + outgoing);
     const real rough = hg_to_ggx(lobe.asymmetry);
+#if USE_EARL_G2 == 1
+    const real G2 = smithG2(outgoing, H, incident, rough);
+#else
     const real G2 = smithG(incident, outgoing, H, rough);
-    const real D = D_GGX(H, rough);
+#endif
     
+#if USE_D_KARIS == 1
+    const float3 N = float3(0,0,1);
+    const real D = D_GGX_Karis(dot(N,H), rough);
+#else
+    const real D = D_GGX(H, rough);
+#endif
     const float essi = sample_GD(incident.z, rough);
     
-    const float f = G2 * D / (4.0f * incident.z * essi);
+    const float f = G2 * D / (4.0 * incident.z * essi);
     
     
     return lobe.norm * f;
@@ -558,8 +579,9 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
         lobes[k] = zero_hg();
     }
     
-    
+    const float3 H = float3(0., 0., 1.0);    
     const int lobe_count = outgoing_lobes(rec.incident, props, lobes, lobe_incident);
+
     
     real3 throughput = 0.0.xxx;
     real weight_sum = 0.0;
@@ -568,28 +590,53 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
         weight_sum += float3_average(lobes[l].norm);
     }
     
-            
+    float pdf = 0.0;
+    {
+        for (int j = 0; j < lobe_count; j++)
+        {
+            float3 incoming = lobe_incident[j];
+            const float lobe_weight = float3_average(lobes[j].norm);
+            if (lobe_weight > 0.0)
+            {
+                const float rough = hg_to_ggx(lobes[j].asymmetry);
+#if SCHLICK_G == 1
+                const float G1 = SchlickG1(incoming, rough);
+                
+
+#else
+                const float G1 = smithG1(incoming, H, rough);
+                
+             
+#endif
+                
+#if USE_D_KARIS == 1
+                const float3 N = float3(0,0,1);
+                const float D = D_GGX_Karis(dot(N,H), rough);
+#else
+                const float D = D_GGX(H, rough);
+#endif        
+                pdf += ((lobe_weight) * (G1 * D / (4.0 * incoming.z)));
+            }
+        }
+        pdf = safe_div(pdf, weight_sum);
+    }
+    float3 IBLSamples = 0.0;
     
     
-    
-    const float3 H = float3(0., 0., 1.0);
-    for (int i = 0; i < lobe_count + 1; i++)
+    for (int i = 0; i < lobe_count; i++)
     {
         if (!isZero(lobes[i].norm))
         {
             
-
-            float3 lobe_throughput = 0.0f;
-            float lobe_pdf = 0.0f;
             float lobe_weight = float3_average(lobes[i].norm);
             const float rough = hg_to_ggx(lobes[i].asymmetry);
         
             rec.outgoing = reflectSpherical(lobe_incident[i], H);
-            rec.ior = 1.0f;
+            rec.ior = 1.0;
             rec.is_reflection_sample = 0;
             rec.sample_type = TM_SAMPLE_TYPE_GLOSSY_REFLECTION;
         
-            if (rec.outgoing.z <= 0.0f)
+            if (rec.outgoing.z <= 0.0)
             {
                 //no contribution
                 continue;
@@ -604,11 +651,14 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
             
             const float3 H = normalize(incoming + outgoing);
             const float G1 = smithG1(incoming, H, rough);
-            const float D = D_GGX(H, rough);
             
-            lobe_pdf = (lobe_weight * G1 * D / (4.0f * incoming.z)) / weight_sum;
-
-        
+#if USE_D_KARIS == 1
+            const float3 N = float3(0,0,1);
+            const float D = D_GGX_Karis(dot(N,H), rough);
+#else
+            const float D = D_GGX(H, rough);
+#endif
+    
             if (i == 0)
             {
                 const float3 H = float3(0., 0., 1.); //mirror reflection about normal, 
@@ -617,9 +667,17 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
                 
                 const float3 lobe_outgoing = specular_dominant(H, rec.outgoing, dot(H, lobe_incident[1]), rough);
         
+#if USE_EARL_G2 == 1
+                float G2 = smithG2(rec.outgoing, rec.incident, H, props.rough[1]);
+#else
                 float G2 = smithG(rec.incident, rec.outgoing, H, props.rough[1]);
+#endif           
+#if USE_D_KARIS == 1
+                const float3 N = float3(0,0,1);
+                float D = D_GGX_Karis(dot(N,H), props.rough[1]);
+#else
                 float D = D_GGX(H, props.rough[1]);
-            
+#endif
                 const float3 iors_01 = props.iors[1] / props.iors[0];
                 float3 F;
             
@@ -636,26 +694,28 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
                 const float BottomRough = props.rough[1];
                 const float BottomLOD = BottomRough * IBLRange + IBLBias;
                 const float3 TopIBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, outgoingWS, BottomLOD);
-                throughput += ((F * G2 * D / (4.0f * rec.incident.z)) / lobe_pdf) * TopIBLSample;
+                IBLSamples += (TopIBLSample / (float) (lobe_count));
+                throughput += ((F * G2 * D / (4.0 * rec.incident.z)));
             }
         
             if (i >= 1)
             {
-                lobe_throughput += eval_lobe(lobe_incident[i], rec.outgoing, lobes[i]);
+                const float3 lobe_throughput = eval_lobe(lobe_incident[i], rec.outgoing, lobes[i]);
                 const float3 lobe_outgoing = specular_dominant(H, rec.outgoing, dot(H, lobe_incident[i]), rough);
                 const float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(lobe_outgoing));
 
                 const float LOD = rough * IBLRange + IBLBias;
                 const float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, outgoingWS, LOD);
             
-                throughput += (lobe_throughput / lobe_pdf) * IBLSample;
+                IBLSamples += (IBLSample / (float) (lobe_count));
+                throughput += (lobe_throughput);
             
             }
 
         }
     
     }
-    return throughput;
+    return safe_div(throughput, pdf) * IBLSamples;
     
 }
 
@@ -693,7 +753,7 @@ float4 main(VSOutput vsOutput) : SV_Target0
     
     if (any(isnan(output)))
     {
-        output = 0.0.xxx;
+        output = NAN_DEBUG;
     }
 	
     return float4(output, 1.0f);

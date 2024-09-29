@@ -66,7 +66,7 @@ real2x2 asymmetry_matrix(layer_components_tm2 ops)
 
 
 
-void dielectric_transfer_factors(float3 incident, real ior, real alpha, out layer_components_tm2 ops)
+void dielectric_transfer_factors(real3 incident, real ior, real alpha, out layer_components_tm2 ops)
 {
     real ior_ji = 0.0;
     real s_t_ij = 0.0;
@@ -104,7 +104,7 @@ void dielectric_transfer_factors(float3 incident, real ior, real alpha, out laye
 
 }
 
-void conductor_transfer_factors(float3 incident, real3 ior, real3 kappa, real rough, out layer_components_tm2 ops)
+void conductor_transfer_factors(real3 incident, real3 ior, real3 kappa, real rough, out layer_components_tm2 ops)
 {
     ops = zero_init_tm2_components();
     ops.component_type = TM_TYPE_CONDUCTORINTERFACE;

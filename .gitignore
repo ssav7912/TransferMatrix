@@ -26,3 +26,6 @@ Samples/Desktop/D3D12HelloWorld/src/HelloVAEncode/*.h264
 /MiniEngine/ModelViewer/x64/Debug
 /MiniEngine/ModelViewer/x64/Release
 /MiniEngine/TransferMatrix/TIR.ipynb
+/MiniEngine/LUTValidate/x64/Debug/LUTValidate.obj
+/MiniEngine/LUTValidate/x64/Debug/vc143.idb
+/MiniEngine/LUTValidate/x64/Debug/vc143.pdb

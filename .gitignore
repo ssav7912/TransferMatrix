@@ -29,3 +29,10 @@ Samples/Desktop/D3D12HelloWorld/src/HelloVAEncode/*.h264
 /MiniEngine/LUTValidate/x64/Debug/LUTValidate.obj
 /MiniEngine/LUTValidate/x64/Debug/vc143.idb
 /MiniEngine/LUTValidate/x64/Debug/vc143.pdb
+/MiniEngine/TransferMatrix/__pycache__
+/MiniEngine/TransferMatrix/renders
+/MiniEngine/TransferMatrix/energyleakage
+/MiniEngine/TransferMatrix/comparisons
+/MiniEngine/LUTValidate/x64/Debug/LUTValidate.obj
+/MiniEngine/LUTValidate/x64/Debug/vc143.idb
+/MiniEngine/LUTValidate/x64/Debug/vc143.pdb

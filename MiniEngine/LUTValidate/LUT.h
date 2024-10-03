@@ -174,7 +174,6 @@ public:
             alphas[k] = CLAMP(a[k] - (float)i[k], 0.f, 1.f);
         }
 
-        std::cout << std::format("FGD Indices: [{0},{1},{2}, {3}]", i[0], i[1], i[2], i[3]) << std::endl;
         int index = linear_index_from_grid_index(i);
 
         // Lookup result

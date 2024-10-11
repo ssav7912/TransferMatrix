@@ -362,6 +362,7 @@ void ModelViewer::RenderScene( void )
         layers.G[0].x = 0.0f;
 
         layers.Roughs[0].x = 1.0f;
+        gui.NumLayers = std::min(gui.NumLayers, TransferMatrixResources::MAX_LAYERS - 1);
         layers.layers = gui.NumLayers;
         layers.num_samples = gui.NumSamples;
         

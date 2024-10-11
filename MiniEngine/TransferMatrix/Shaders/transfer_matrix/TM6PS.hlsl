@@ -318,7 +318,6 @@ void components_transfer_factors_tm6(float3 incident, LayerProperties props, out
     
     for (int i = 0; i < NumLayers; i++)
     {
-        ops[i] = ops_zero_init();
         ior_ij = props.iors[i + 1] / props.iors[i];
         
         if (isZero(props.kappas[i + 1]))
@@ -541,7 +540,7 @@ float3 eval_lobe(float3 incident, float3 outgoing, henyey_greenstein lobe)
     
     const float essi = sample_GD(incident.z, rough);
     
-    const float f = G2 * D / (4.0f * incident.z * essi);
+    const float f = G2 * D / (4.0 * incident.z * essi);
     
     
     return lobe.norm * f;
@@ -549,7 +548,8 @@ float3 eval_lobe(float3 incident, float3 outgoing, henyey_greenstein lobe)
 
 float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProperties props)
 {
-    
+    const float3 N = float3(0., 0., 1.0);
+
     henyey_greenstein lobes[TM6_LOBE_MAX];
     float3 lobe_incident[TM6_LOBE_MAX];
     for (int k = 0; k < TM6_LOBE_MAX; k++)
@@ -561,35 +561,59 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
     
     const int lobe_count = outgoing_lobes(rec.incident, props, lobes, lobe_incident);
     
-    real3 throughput = 0.0.xxx;
-    real weight_sum = 0.0;
-    for (int l = 0; l < lobe_count; l++)
+
+    
+              
+    float3 throughput = 0.0.xxx;
+    float3 IBLSamples = 0.0.xxx;
+    float weight_sum = 0.0;
+    
+    //compute PDF
+    float pdf = 0.0;
     {
-        weight_sum += float3_average(lobes[l].norm);
+        for (int j = 0; j < lobe_count; j++)
+        {
+
+            const float lobe_weight = float3_average(lobes[j].norm);
+            weight_sum += lobe_weight;
+            if (lobe_weight > 0.0)
+            {
+                
+            
+                const float rough = hg_to_ggx(lobes[j].asymmetry);
+            
+                float3 incoming = lobe_incident[j];
+                //model lobe shift due to high roughness
+                float3 outgoing = specular_dominant(N, rec.outgoing, saturate(dot(N, rec.incident)), rough);
+                const float3 H = normalize(incoming + outgoing);
+            
+#if SCHLICK_G == 1
+                const float G1 = SchlickG1(incoming, rough);
+#else
+                const float G1 = smithG1(incoming, H, rough);
+                
+#endif
+                const float D = D_GGX(H, rough);
+            
+                pdf += ((lobe_weight) * (G1 * D / (4.0 * incoming.z)));
+            }
+        }
+        pdf = safe_div(pdf, weight_sum);
     }
     
-            
     
-    
-    
-    const float3 H = float3(0., 0., 1.0);
-    for (int i = 0; i < lobe_count + 1; i++)
+    for (int i = 0; i < lobe_count; i++)
     {
         if (!isZero(lobes[i].norm))
         {
             
 
-            float3 lobe_throughput = 0.0f;
-            float lobe_pdf = 0.0f;
             float lobe_weight = float3_average(lobes[i].norm);
             const float rough = hg_to_ggx(lobes[i].asymmetry);
         
-            rec.outgoing = reflectSpherical(lobe_incident[i], H);
-            rec.ior = 1.0f;
-            rec.is_reflection_sample = 0;
-            rec.sample_type = TM_SAMPLE_TYPE_GLOSSY_REFLECTION;
+            rec.outgoing = reflectSpherical(lobe_incident[i], N);
         
-            if (rec.outgoing.z <= 0.0f)
+            if (rec.outgoing.z <= 0.0)
             {
                 //no contribution
                 continue;
@@ -599,27 +623,22 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
 
             float3 incoming = lobe_incident[i];
             float3 outgoing = rec.outgoing;
-            incoming.z = abs(incoming.z);
-            outgoing.z = abs(outgoing.z);
-            
-            const float3 H = normalize(incoming + outgoing);
-            const float G1 = smithG1(incoming, H, rough);
-            const float D = D_GGX(H, rough);
-            
-            lobe_pdf = (lobe_weight * G1 * D / (4.0f * incoming.z)) / weight_sum;
 
         
             if (i == 0)
             {
-                const float3 H = float3(0., 0., 1.); //mirror reflection about normal, 
-                    //as using preintegrated lighting.
-                rec.outgoing = reflectSpherical(rec.incident, H);
+
+                rec.outgoing = reflectSpherical(rec.incident, N);
                 
-                const float3 lobe_outgoing = specular_dominant(H, rec.outgoing, dot(H, lobe_incident[1]), rough);
+                const float3 lobe_outgoing = specular_dominant(N, rec.outgoing, dot(N, lobe_incident[1]), rough);
+                const float3 H = normalize(rec.incident + lobe_outgoing); //mirror reflection about normal, 
         
+                
                 float G2 = smithG(rec.incident, rec.outgoing, H, props.rough[1]);
                 float D = D_GGX(H, props.rough[1]);
             
+                    //as using preintegrated lighting.
+                
                 const float3 iors_01 = props.iors[1] / props.iors[0];
                 float3 F;
             
@@ -636,51 +655,53 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
                 const float BottomRough = props.rough[1];
                 const float BottomLOD = BottomRough * IBLRange + IBLBias;
                 const float3 TopIBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, outgoingWS, BottomLOD);
-                throughput += ((F * G2 * D / (4.0f * rec.incident.z)) / lobe_pdf) * TopIBLSample;
+                IBLSamples +=  TopIBLSample / (float) lobe_count;
+                throughput += ((F * G2 * D / (4.0 * rec.incident.z)));
             }
         
             if (i >= 1)
             {
-                lobe_throughput += eval_lobe(lobe_incident[i], rec.outgoing, lobes[i]);
-                const float3 lobe_outgoing = specular_dominant(H, rec.outgoing, dot(H, lobe_incident[i]), rough);
+                
+                const float3 lobe_outgoing = specular_dominant(N, rec.outgoing, dot(N, lobe_incident[i]), rough);
+                float3 lobe_throughput = eval_lobe(lobe_incident[i], lobe_outgoing, lobes[i]);
                 const float3 outgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(lobe_outgoing));
 
                 const float LOD = rough * IBLRange + IBLBias;
                 const float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, outgoingWS, LOD);
             
-                throughput += (lobe_throughput / lobe_pdf) * IBLSample;
+                IBLSamples += IBLSample / (float)lobe_count;
+                throughput += lobe_throughput;
             
             }
 
         }
     
     }
-    return throughput;
+    return safe_div(throughput, pdf) * IBLSamples;
     
 }
 
 
 float4 main(VSOutput vsOutput) : SV_Target0
 {
-    float3 normal = normalize(vsOutput.normal);
+    const float3 normal = normalize(vsOutput.normal);
     
-    float3 tangent = normalize(vsOutput.tangent.xyz);
-    float3 bitangent = normalize(cross(normal, tangent)) * vsOutput.tangent.w;
-    float3x3 WorldToTangent = float3x3(tangent, bitangent, normal);
-    float3x3 TangentToWorld = transpose(WorldToTangent);
+    const float3 tangent = normalize(vsOutput.tangent.xyz);
+    const float3 bitangent = normalize(cross(normal, tangent)) * vsOutput.tangent.w;
+    const float3x3 WorldToTangent = float3x3(tangent, bitangent, normal);
+    const float3x3 TangentToWorld = transpose(WorldToTangent);
     
-    float3 ViewerRay = normalize(ViewerPos - vsOutput.worldPos);
+    const float3 ViewerRay = normalize(ViewerPos - vsOutput.worldPos);
+    
+    const float3 incident = cartesianTSToMitsubaLS(mul(WorldToTangent, ViewerRay));
+    const float3 outgoing = reflectSpherical(incident, float3(0.0, 0.0, 1.0)); //Mirror reflection about normal.
     
     sample_record rec =
     {
         //feel like there's something wrong with the CRS i'm providing,
         //but I don't know what.
-        cartesianTSToMitsubaLS(mul(WorldToTangent, ViewerRay)),
-        normalize(cartesianTSToMitsubaLS(mul(WorldToTangent, reflect(-ViewerRay, normal)))),
-
-        1.0f,
-        true,
-        TM_SAMPLE_TYPE_GLOSSY_REFLECTION
+        incident,
+        outgoing,
     };
     
     

@@ -53,13 +53,14 @@ SamplerState cubeMapSampler : register(s12);
 typedef min16float real;
 typedef min16float2 real2; 
 typedef min16float3 real3; 
+typedef min16float4 real4;
 typedef min16float2x2 real2x2; 
-
 
 #else
 typedef float real;
 typedef float2 real2;
 typedef float3 real3;
+typedef float4 real4;
 typedef float2x2 real2x2;
 #endif
 

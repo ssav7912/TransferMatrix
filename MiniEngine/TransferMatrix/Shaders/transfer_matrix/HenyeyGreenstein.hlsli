@@ -72,14 +72,6 @@ real hg_refract(real asymmetry, real ior)
     return min(sqrt(max(1.0 - (1.0 - asymmetry * asymmetry) * pow(ior, 0.75), 0.0)), 1.0);
 }
 
-//equation 16
-//@param g_i incoming light distribution with asymmetry g_i
-//@param rough roughness of dielectric interface.
-float dielectric_reflected_asymmetry(float g_i, float rough)
-{
-    return clamp(g_i, -1.0f, 1.0f) * ggx_to_hg(rough);
-}
-
 ///Equation 9. 
 ///Belcour scaling factor.
 ///n = refractive_index = refractive index of what? 

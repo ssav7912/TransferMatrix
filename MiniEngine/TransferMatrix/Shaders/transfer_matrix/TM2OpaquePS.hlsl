@@ -143,11 +143,9 @@ void outgoing_lobes(float3 incident, real3 ior[LAYERS_MAX], real3 kappas[LAYERS_
 
 }
 
-float3 eval_lobe(const sample_record rec, const hg_nomean lobe)
+real3 eval_lobe(const sample_record rec, const float3 H, const hg_nomean lobe)
 {
     
-    const float3 H = normalize(rec.incident + rec.outgoing);
-
 
     if (lobe.norm.x + lobe.norm.y + lobe.norm.z == 0.0)
     {
@@ -164,9 +162,9 @@ float3 eval_lobe(const sample_record rec, const hg_nomean lobe)
     const real D = D_GGX(H, rough); //TODO: check that H is correct use...
 #else
     const real3 N = float3(0,0,1);
-    const real D = D_GGX_Karis(dot(N, H), rough);
+    const real D = D_GGX_Karis(saturate(dot(N, H)), rough);
 #endif
-    const float3 f = (G2 * D) / (4.0 * rec.incident.z);
+    const real3 f = (G2 * D) / (4.0 * rec.incident.z);
         
     float3 throughput = lobe.norm * f;
 
@@ -174,73 +172,58 @@ float3 eval_lobe(const sample_record rec, const hg_nomean lobe)
     return throughput;
 }
 
-float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, LayerProperties props)
+real3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld, LayerProperties props)
 {
-    if (rec.incident.z < 0)
-    {
-        return PDF_DEBUG;
-    }
-    
-    const float3 H = float3(0.f, 0.f, 1.f); //mirror reflection about normal, 
-            //as using preintegrated lighting.
-    
-        
-    //get the outgoing lobes
-    hg_nomean lobes[LAYERS_MAX];
-    outgoing_lobes(rec.outgoing, props.iors, props.kappas, props.rough, lobes);
-    
-        //shift the outgoing lobe direction to correct for lobe mean.
-        
-    rec.outgoing = reflectSpherical(rec.incident, H);
-
-
-    
-    if (rec.outgoing.z <= 0.0f)
+    if (rec.incident.z <= 0 || rec.outgoing.z <= 0)
     {
         return EVAL_DEBUG;
     }
     
+    const float3 N = float3(0., 0., 1.); //H == N when not using specular_dominat. 
+
+        
+    //get the outgoing lobes
+    hg_nomean lobes[LAYERS_MAX];
+    outgoing_lobes(rec.incident, props.iors, props.kappas, props.rough, lobes);
     
+    //shift the outgoing lobe direction to correct for lobe mean.
+       
     
-    float3 throughput = 0.0;
-    float3 lobe_throughput = 0.0;
+    real3 throughput = 0.0;
     float3 IBLSamples = 0.0;
-    float weight_sum = 0.0;
-    //compute lobe weights
-    for (int k = 0; k < NumLayers; k++)
-    {
-        weight_sum += float3_average(lobes[k].norm);
-    }
+    real weight_sum = 0.0;
     
-    //compute PDF separately
-        float pdf = 0.0;
+    //compute PDF
+        real pdf = 0.0;
     {
         for (int j = 0; j < NumLayers; j++)
         {
 
-            const float lobe_weight = float3_average(lobes[j].norm);
+            const real lobe_weight = float3_average(lobes[j].norm);
+            weight_sum += lobe_weight;
             if (lobe_weight > 0.0)
             {
                 
             
-                const float rough = hg_to_ggx(lobes[j].asymmetry);
+                const real rough = hg_to_ggx(lobes[j].asymmetry);
             
                 float3 incoming = rec.incident;
-                float3 outgoing = rec.outgoing;
-
+                //model lobe shift due to high roughness
+                float3 outgoing = specular_dominant(N, rec.outgoing, saturate(dot(N, rec.incident)), rough);
+                const float3 H = normalize(incoming + outgoing);
             
-                const float3 H = float3(0, 0, 1);
 #if SCHLICK_G == 1
-                const float G1 = SchlickG1(incoming, rough);
+                const real G1 = SchlickG1(incoming, rough);
 #else
-                const float G1 = smithG1(incoming, H, rough);
+                const real G1 = smithG1(incoming, H, rough);
                 
 #endif
-                const float D = D_GGX(H, rough);
+                const real D = D_GGX(H, rough);
             
-                pdf += ((lobe_weight / weight_sum) * (G1 * D / (4.0 * incoming.z)));
+                pdf += ((lobe_weight) * (G1 * D / (4.0 * incoming.z)));
             }
         }
+        pdf = safe_div(pdf, weight_sum);
     }
     
     
@@ -254,49 +237,19 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
         
             real lobe_weight = float3_average(lobes[i].norm);
             const real rough = hg_to_ggx(lobes[i].asymmetry);
-           
-     
-            rec.ior = 1.0f;
-            rec.is_reflection_sample = false;
-            rec.sample_type = TM_SAMPLE_TYPE_GLOSSY_REFLECTION;
-        
-        
-        //pdf
-            float lobe_pdf = 0.0;
-            {
-            
-                float3 incoming = rec.incident;
-                float3 outgoing = rec.outgoing;
-                incoming.z = abs(incoming.z);
-                outgoing.z = abs(outgoing.z);
-            
-                const float3 H = normalize(incoming + outgoing);
-#if defined(SCHLICK_G) && SCHLICK_G == 1
-                const float G1 = SchlickG1(incoming, rough);          
-#else
-                const float G1 = smithG1(incoming, H, rough);
-#endif
-#if !defined(USE_D_KARIS) || USE_D_KARIS == 0
-                const float D = D_GGX(H, rough);
-            #else
-                const float D = D_GGX_Karis(dot(N, H), rough);
-#endif                
-                lobe_pdf = ((lobe_weight / weight_sum) * G1 * D / (4.0 * incoming.z));
-
-            }
-        
         
             if (i == 0)
             {
                 
                 //top reflection correction. [Bati 2019]
                 const real TopRough = props.rough[1];
+                const float3 TopLobeOutgoing = specular_dominant(N, rec.outgoing, saturate(dot(N, rec.incident)), TopRough);
+                const float3 H = normalize(rec.incident + TopLobeOutgoing);
 #if !defined(USE_EARL_G2) || USE_EARL_G2 == 0
-                const real G2_0 = smithG(rec.incident, rec.outgoing, H, TopRough);
+                const real G2_0 = smithG(rec.incident, TopLobeOutgoing, H, TopRough);
 #else
-                const real G2_0 = smithG2(rec.outgoing, H, rec.incident, TopRough);
+                const real G2_0 = smithG2(TopLobeOutgoing, H, rec.incident, TopRough);
 #endif
-                const float3 TopLobeOutgoing = specular_dominant(H, rec.outgoing, dot(H, rec.incident), TopRough);
                 
                 const float3 topOutgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(TopLobeOutgoing));
                 const float BottomLOD = TopRough * IBLRange + IBLBias;
@@ -311,14 +264,15 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
                 const real3 ior_01 = props.iors[1] / props.iors[0];
                 if (isZero(props.kappas[1]))
                 {
-                    F0 = fresnelDielectric(dot(rec.incident, H), float3_average(ior_01));
+                    F0 = fresnelDielectric(saturate(dot(rec.incident, H)), float3_average(ior_01));
+                    //F0 = fresnelDielectric(saturate(dot(rec.incident, H)), ior_01);
                 }
                 else
                 {
-                    F0 = fresnelConductorExact(dot(rec.incident, H), ior_01, props.kappas[1] / props.iors[0]);
+                    F0 = fresnelConductorExact(saturate(dot(rec.incident, H)), ior_01, props.kappas[1] / props.iors[0]);
                 }
 
-                IBLSamples += (TopIBLSample / (float) NumLayers);
+                IBLSamples += (TopIBLSample / (real) NumLayers);
                 throughput += ((F0 * G2_0 * D0_0/ (4.0 * rec.incident.z)));
             }
               
@@ -326,13 +280,13 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
             if (i >= 1)
             {
                 
-                
+                const float3 lobeOutgoing = specular_dominant(N, rec.outgoing, saturate(dot(N, rec.incident)), rough);
+                const float3 H = normalize(rec.incident + lobeOutgoing);
 #if !defined(USE_EARL_G2) || USE_EARL_G2 == 0
-                const float G = smithG(rec.incident, rec.outgoing, H, rough);
+                const real G = smithG(rec.incident, normalize(lobeOutgoing), H, rough);
 #else
-                const float G = smithG2(rec.outgoing, H, rec.incident, rough);
+                const real G = smithG2(lobeOutgoing, H, rec.incident, rough);
 #endif
-                const float3 lobeOutgoing = specular_dominant(H, rec.outgoing, dot(H, rec.incident), rough);
                 
                 const float3 lobeOutgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(lobeOutgoing));
                 
@@ -340,10 +294,12 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
                 const float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, lobeOutgoingWS, LOD);
                 //throughput
                 
-                const float3 individual_lobe = eval_lobe(rec, lobes[i]);
+                const sample_record lobe_rec = { rec.incident, normalize(lobeOutgoing)  };
+                
+                const real3 individual_lobe = eval_lobe(lobe_rec, H, lobes[i]);
                 throughput += individual_lobe;
             
-                IBLSamples += (IBLSample / (float) NumLayers);
+                IBLSamples += (IBLSample / (real) NumLayers);
                 
             }
  
@@ -351,7 +307,8 @@ float3 sample_preintegrated(inout sample_record rec, float3x3 TangentToWorld, La
     }
     
    
-    return safe_div(throughput, pdf) * IBLSamples;
+    return !all(isnan(throughput)) && !isnan(pdf) ?
+    safe_div(throughput, pdf) * IBLSamples : NAN_DEBUG;
 }
 
 
@@ -368,20 +325,15 @@ float4 main(VSOutput vsOutput) : SV_Target0
     const float3 ViewerRay = normalize(ViewerPos - vsOutput.worldPos);
     
     const float3 incident = cartesianTSToMitsubaLS(mul(WorldToTangent, ViewerRay));
-    const float3 outgoing = reflectSpherical(incident, float3(0., 0., 1.0)); //reflect about H
+    const float3 outgoing = reflectSpherical(incident, float3(0., 0., 1.0)); //reflect about N
     
     
     
     
     sample_record rec =
     {
-        //feel like there's something wrong with the CRS i'm providing,
-        //but I don't know what.
         incident,
         outgoing,
-        1.0,
-        true,
-        TM_SAMPLE_TYPE_GLOSSY_REFLECTION
     };
     
     
@@ -397,7 +349,7 @@ float4 main(VSOutput vsOutput) : SV_Target0
     //
     //output = lobes[NumLayers-1].norm.xxx;
     
-    //output = sample_FGD(incident.z, props.rough[NumLayers], props.iors[NumLayers], props.kappas[NumLayers]);
+    //output = sample_FGD(1.0, props.rough[NumLayers], props.iors[NumLayers], props.kappas[NumLayers]);
     
     
     return float4(output, 1.0);

@@ -93,7 +93,7 @@ void Renderer::Initialize(void)
     const std::wstring FGD_LUT = L"tm_FGD.bin";
 #endif
 
-    transfer_matrix.Initialise("FGD.dds", FGD_LUT, L"tm_GD.bin", TIR_LUT);
+    transfer_matrix.Initialise("FGD.dds", "FGDBelcour.dds", FGD_LUT, L"tm_GD.bin", TIR_LUT);
 
 
     if (s_Initialized)
@@ -121,7 +121,7 @@ void Renderer::Initialize(void)
     m_RootSig[kMaterialConstants].InitAsConstantBuffer(0, D3D12_SHADER_VISIBILITY_PIXEL);
     m_RootSig[kMaterialSRVs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 0, TransferMatrixResources::MAX_TEXTURES, D3D12_SHADER_VISIBILITY_PIXEL); //allocate space for MAX_LAYERS * 7 params. 
     m_RootSig[kMaterialSamplers].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SAMPLER, 0, 10, D3D12_SHADER_VISIBILITY_PIXEL);
-    m_RootSig[kCommonSRVs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, TransferMatrixResources::MAX_TEXTURES, 12, D3D12_SHADER_VISIBILITY_PIXEL);
+    m_RootSig[kCommonSRVs].InitAsDescriptorRange(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, TransferMatrixResources::MAX_TEXTURES, 13, D3D12_SHADER_VISIBILITY_PIXEL);
     m_RootSig[kCommonCBV].InitAsConstantBuffer(1);
     m_RootSig[kLayerCBV].InitAsConstantBuffer(2, D3D12_SHADER_VISIBILITY_PIXEL); //layer CBV
     m_RootSig[kSkinMatrices].InitAsBufferSRV(20, D3D12_SHADER_VISIBILITY_VERTEX);
@@ -257,11 +257,11 @@ void Renderer::Initialize(void)
     Lighting::InitializeResources();
 
     // Allocate a descriptor table for the common textures
-    constexpr size_t NumTransferMatrixResources = 4;
+    constexpr size_t NumTransferMatrixResources = 5;
     m_CommonTextures = s_TextureHeap.Alloc(8 + NumTransferMatrixResources);
 
     uint32_t DestCount = 8 + NumTransferMatrixResources;
-    uint32_t SourceCounts[] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+    uint32_t SourceCounts[] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
 
     D3D12_CPU_DESCRIPTOR_HANDLE SourceTextures[] =
     {
@@ -277,6 +277,7 @@ void Renderer::Initialize(void)
         transfer_matrix.FGD_LUT.GetSRV(),
         transfer_matrix.FGD_4D_LUT.GetSRV(),
         transfer_matrix.GD_LUT.GetSRV(),
+        transfer_matrix.FGD_Belcour_LUT.GetSRV()
         
     };
 

@@ -14,9 +14,9 @@ class TransferMatrixResources
 {
 public:
 	TransferMatrixResources() = default;
-	TransferMatrixResources(const std::string & FGD_path, const std::wstring& FGD_4D_path, const std::wstring& GD_path, const std::wstring & TIR_path);
+	TransferMatrixResources(const std::string & FGD_path, const std::string& FGD_Belcour_path, const std::wstring& FGD_4D_path, const std::wstring& GD_path, const std::wstring & TIR_path);
 
-	void Initialise(const std::string& FGD_path, const std::wstring& FGD_4D_path, const std::wstring& GD_path, const std::wstring& TIR_path);
+	void Initialise(const std::string& FGD_path, const std::string& FGD_Belcour_path, const std::wstring& FGD_4D_path, const std::wstring& GD_path, const std::wstring& TIR_path);
 
 	bool UseTM6 = false;
 
@@ -24,8 +24,9 @@ public:
 	GraphicsPSO TM6PSO{ L"6-flux Transfer Matrix PSO" };
 
 	Texture3D TIR_LUT;
-	TextureRef FGD_LUT;
+	TextureRef FGD_LUT; //Karis split-sum approx
 	Texture GD_LUT;
+	TextureRef FGD_Belcour_LUT; //Belcour split-sum approx
 	Texture3D FGD_4D_LUT;
 
 

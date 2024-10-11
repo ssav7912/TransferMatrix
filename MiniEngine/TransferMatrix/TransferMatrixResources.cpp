@@ -15,19 +15,21 @@
 #include "TM2OpaquePS.h"
 #include "TM6PS.h"
 
-TransferMatrixResources::TransferMatrixResources(const std::string & FGD_path, const std::wstring& FGD_4D_path, const std::wstring& GD_path, const std::wstring & TIR_path)
+TransferMatrixResources::TransferMatrixResources(const std::string & FGD_path, const std::string& FGD_Belcour_path, const std::wstring& FGD_4D_path, const std::wstring& GD_path, const std::wstring & TIR_path)
 {
 
 	//init PSO
-	Initialise(FGD_path, FGD_4D_path, GD_path, TIR_path);
+	Initialise(FGD_path, FGD_Belcour_path, FGD_4D_path, GD_path, TIR_path);
 
 }
 
-void TransferMatrixResources::Initialise(const std::string& FGD_path, const std::wstring& FGD_4D_path, const std::wstring& GD_path, const std::wstring& TIR_path)
+void TransferMatrixResources::Initialise(const std::string& FGD_path, const std::string& FGD_Belcour_path, const std::wstring& FGD_4D_path, const std::wstring& GD_path, const std::wstring& TIR_path)
 {
 
 	auto tex = TextureManager::LoadDDSFromFile(FGD_path);
 	FGD_LUT = tex;
+	auto tex2 = TextureManager::LoadDDSFromFile(FGD_Belcour_path);
+	FGD_Belcour_LUT = tex2;
 
 	GD_LUT = LoadGDLUTFromFile(GD_path);
 
@@ -173,12 +175,14 @@ Texture3D TransferMatrixResources::LoadFGDLUTFromFile(const std::wstring& FGD_pa
 	std::vector<float> data;
 	LoadLUTFromFile<4>(FGD_path, data);
 
+	DimZ = 64;
+	size_t DimW = 64;
 
 	//crushed vector
-	std::vector<float> new_data(Dim * Dim * Dim * (Dim / 2), std::nanf("NaN"));
+	std::vector<float> new_data(DimX * DimY * DimZ * (DimW / 2), std::nanf("NaN"));
 
 	const size_t data_size = data.size();
-	constexpr size_t StrideDimension4 = Dim * Dim * Dim; //access every 4th dimensional element. 
+	const size_t StrideDimension4 = DimX * DimY * DimZ; //access every 4th dimensional element. 
 
 
 	size_t i = 0; 
@@ -216,13 +220,13 @@ Texture3D TransferMatrixResources::LoadFGDLUTFromFile(const std::wstring& FGD_pa
 
 
 	//4D texture
-	ASSERT(new_data.size() == Dim * Dim * Dim * (Dim/2));
+	ASSERT(new_data.size() == DimX * DimY * DimZ * (DimW/2));
 
 	const void* data_ptr = new_data.data();
 
 	//encode 4D LUT in 3D texture, Z dim encodes Z + W of index.
 	//i.e. dim = 64 * 64 * (64 * 32) = 64 * 64 * 32. 
-	const size_t RowPitchBytes = Dim * sizeof(float);
+	const size_t RowPitchBytes = DimX * sizeof(float);
 #endif
 
 

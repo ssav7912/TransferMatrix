@@ -25,6 +25,21 @@
 #define ALPHA_AIR 0.0.xxx
 
 
+//Preprocessor switch validations,
+#if USE_KARIS_FGD == 1 && USE_BELCOUR_FGD == 1
+    #error "Only 1 of USE_KARIS_FGD or USE_BELCOUR_FGD can be enabled, not both!"
+#endif
+
+#if ANALYTIC_TIR == 1 && DISABLE_TIR == 1
+    #error "Only 1 of USE_ANALYTIC_TIR or DISABLE_TIR can be enabled, not both!" 
+#endif
+
+#if USE_EARL_G2 == 1 && SCHLICK_G == 1
+    #error "Only 1 of USE_EARL_G2 or SCHLICK_G can be enabled, not both!"
+
+#endif
+
+
 struct sample_record
 {
     float3 incident;

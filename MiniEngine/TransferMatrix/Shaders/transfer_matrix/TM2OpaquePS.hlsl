@@ -5,9 +5,23 @@
 void components_transfer_factors(float3 incident, real3 iors[LAYERS_MAX], real3 kappas[LAYERS_MAX], real roughness[LAYERS_MAX], out layer_components_tm2 ops[LAYERS_MAX])
 {
     real3 ior_ij = 0.0;
-    
+    ops[0] = zero_init_tm2_components();
+
+    //air-layer interface. Known at compile time.
+    ior_ij = iors[1] / IOR_AIR;
+    if (isZero(kappas[1]))
+    {
+        dielectric_transfer_factors(incident, float3_average(ior_ij), roughness[1], ops[0]);
+        incident = -ops[0].transmission_down.mean;
+    }
+    else
+    {
+        conductor_transfer_factors(incident, ior_ij, kappas[1] / IOR_AIR, roughness[1], ops[0]);
+    }
+
+    //rest of the layers.
     [loop]
-    for (int i = 0; i < NumLayers; i++)
+    for (int i = 1; i < NumLayers; i++)
     {
         ops[i] = zero_init_tm2_components();
         ior_ij = iors[i + 1] / iors[i];
@@ -261,7 +275,7 @@ real3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld, LayerProp
                 const real D0_0 = D_GGX_Karis(dot(N, H), rough);
 #endif
                 real3 F0 = 0.0.xxx;
-                const real3 ior_01 = props.iors[1] / props.iors[0];
+                const real3 ior_01 = props.iors[1] / IOR_AIR;
                 if (isZero(props.kappas[1]))
                 {
                     F0 = fresnelDielectric(saturate(dot(rec.incident, H)), float3_average(ior_01));
@@ -269,7 +283,7 @@ real3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld, LayerProp
                 }
                 else
                 {
-                    F0 = fresnelConductorExact(saturate(dot(rec.incident, H)), ior_01, props.kappas[1] / props.iors[0]);
+                    F0 = fresnelConductorExact(saturate(dot(rec.incident, H)), ior_01, props.kappas[1] / IOR_AIR);
                 }
 
                 IBLSamples += (TopIBLSample / (real) NumLayers);

@@ -97,33 +97,35 @@ void outgoing_lobes(float3 incident, real3 ior[LAYERS_MAX], real3 kappas[LAYERS_
             ops[i].transmission_up.asymmetry = safe_div(asymmetry_T_0j_RT, asymmetry_T_0j_R);
         
             //toggle to disable the TIR correction. Breaks conservation but seems to massively improve performance.
-#if !defined(DISABLE_TIR) || DISABLE_TIR == 0
+#if DISABLE_TIR != 1
             if (ior_ij < 1.0)
             {
-#if !defined ANALYTIC_TIR || ANALYTIC_TIR == 0
+# if ANALYTIC_TIR == 0
                 tir_norm = TIR_lookup(float3(abs(ops[i].reflection_down.mean.z), hg_to_ggx(asymmetry_T_0i), ior_ij)) * ops[i].transmission_down.norm;
       
-#else
+# else
                 tir_norm = TIR_analytical(abs(ops[i].reflection_down.mean.z), hg_to_ggx(asymmetry_T_0i), ior_ij, 1.0/float3_average(ior[i])) * ops[i].transmission_down.norm;
-#endif
+# endif
                 ops[i].reflection_down.norm += tir_norm;
                 ops[i].transmission_down.norm -= tir_norm;
             }
             else
             {
-#if !defined ANALYTIC_TIR || ANALYTIC_TIR == 0
+# if ANALYTIC_TIR == 0
 
                 tir_norm = TIR_lookup(float3(abs(ops[i].transmission_down.mean.z), hg_to_ggx(asymmetry_T_0j_R), ior_ji)) * ops[i].transmission_up.norm;
 
-#else            
+# else            
                 tir_norm = TIR_analytical(abs(ops[i].transmission_down.mean.z), hg_to_ggx(asymmetry_T_0j_R), ior_ji, 1.0 / float3_average(ior[i + 1])) * ops[i].transmission_up.norm;
-#endif
+# endif
 
                 
                 ops[i].reflection_up.norm += tir_norm;
                 ops[i].transmission_up.norm -= tir_norm; //could go negative if transfer_factors produces negative norm?
             
             }
+#else
+#pragma message "Warning: Disabling TIR. This is not physically correct!"
 #endif
             
             
@@ -178,7 +180,7 @@ real3 eval_lobe(const sample_record rec, const float3 H, const hg_nomean lobe)
     const real3 N = float3(0,0,1);
     const real D = D_GGX_Karis(saturate(dot(N, H)), rough);
 #endif
-    const real3 f = (G2 * D) / (4.0 * rec.incident.z);
+    const real3 f = G2 * D / (4.0 * rec.incident.z);
         
     float3 throughput = lobe.norm * f;
 
@@ -222,9 +224,8 @@ real3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld, LayerProp
                 const real rough = hg_to_ggx(lobes[j].asymmetry);
             
                 float3 incoming = rec.incident;
-                //model lobe shift due to high roughness
-                float3 outgoing = specular_dominant(N, rec.outgoing, saturate(dot(N, rec.incident)), rough);
-                const float3 H = normalize(incoming + outgoing);
+                //pdf should not use shifted lobe - only for sampling IBL?
+                const float3 H = normalize(incoming + rec.outgoing);
             
 #if SCHLICK_G == 1
                 const real G1 = SchlickG1(incoming, rough);
@@ -234,7 +235,7 @@ real3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld, LayerProp
 #endif
                 const real D = D_GGX(H, rough);
             
-                pdf += ((lobe_weight) * (G1 * D / (4.0 * incoming.z)));
+                pdf += (lobe_weight * G1 * D / (4.0 * incoming.z));
             }
         }
         pdf = safe_div(pdf, weight_sum);
@@ -258,9 +259,9 @@ real3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld, LayerProp
                 //top reflection correction. [Bati 2019]
                 const real TopRough = props.rough[1];
                 const float3 TopLobeOutgoing = specular_dominant(N, rec.outgoing, saturate(dot(N, rec.incident)), TopRough);
-                const float3 H = normalize(rec.incident + TopLobeOutgoing);
+                const float3 H = normalize(rec.incident + rec.outgoing);
 #if !defined(USE_EARL_G2) || USE_EARL_G2 == 0
-                const real G2_0 = smithG(rec.incident, TopLobeOutgoing, H, TopRough);
+                const real G2_0 = smithG(rec.incident, rec.outgoing, H, TopRough);
 #else
                 const real G2_0 = smithG2(TopLobeOutgoing, H, rec.incident, TopRough);
 #endif
@@ -295,12 +296,7 @@ real3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld, LayerProp
             {
                 
                 const float3 lobeOutgoing = specular_dominant(N, rec.outgoing, saturate(dot(N, rec.incident)), rough);
-                const float3 H = normalize(rec.incident + lobeOutgoing);
-#if !defined(USE_EARL_G2) || USE_EARL_G2 == 0
-                const real G = smithG(rec.incident, normalize(lobeOutgoing), H, rough);
-#else
-                const real G = smithG2(lobeOutgoing, H, rec.incident, rough);
-#endif
+                const float3 H = normalize(rec.incident + rec.outgoing);
                 
                 const float3 lobeOutgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(lobeOutgoing));
                 
@@ -308,7 +304,7 @@ real3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld, LayerProp
                 const float3 IBLSample = radianceIBLTexutre.SampleLevel(cubeMapSampler, lobeOutgoingWS, LOD);
                 //throughput
                 
-                const sample_record lobe_rec = { rec.incident, normalize(lobeOutgoing)  };
+                const sample_record lobe_rec = { rec.incident, rec.outgoing  };
                 
                 const real3 individual_lobe = eval_lobe(lobe_rec, H, lobes[i]);
                 throughput += individual_lobe;
@@ -361,9 +357,9 @@ float4 main(VSOutput vsOutput) : SV_Target0
     //hg_nomean lobes[LAYERS_MAX];
     //outgoing_lobes(rec.incident, props.iors, props.kappas, props.rough, lobes);
     //
-    //output = lobes[NumLayers-1].norm.xxx;
-    
-    //output = sample_FGD(1.0, props.rough[NumLayers], props.iors[NumLayers], props.kappas[NumLayers]);
+    //output = lobes[NumLayers-1].norm;
+    //
+    //output = sample_FGD(rec.incident.z, props.rough[1], props.iors[1], props.kappas[1]);
     
     
     return float4(output, 1.0);

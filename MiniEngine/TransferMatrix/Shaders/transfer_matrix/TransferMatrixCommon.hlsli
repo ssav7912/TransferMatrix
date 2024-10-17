@@ -282,7 +282,7 @@ float3 reflectZ(float3 f)
 
 float3 refractMitsuba(float3 wi, float3 n, real ior)
 {
-    if (ior == 1)
+    if (ior == 1.0)
     {
         return -wi;
     }
@@ -505,8 +505,8 @@ real3 fresnelConductorExact(real incidentCosTheta, real3 ior, real3 kappa)
     real sinTheta2 = 1.0 - incidentCosTheta2;
     real sinTheta4 = sinTheta2 * sinTheta2;
     
-    real3 temp1 = ior * ior - kappa * kappa - sinTheta2.xxx;
-    real3 a2pb2 = sqrt((temp1 * temp1 + kappa * kappa * ior * ior * 4.0.xxx));
+    real3 temp1 = (ior * ior) - (kappa * kappa) - sinTheta2.xxx;
+    real3 a2pb2 = sqrt(((temp1 * temp1) + (kappa * kappa) * (ior * ior) * 4.0.xxx));
     real3 a = sqrt(((a2pb2 + temp1) * 0.5));
     
     real3 term1 = a2pb2 + incidentCosTheta2.xxx;
@@ -514,7 +514,7 @@ real3 fresnelConductorExact(real incidentCosTheta, real3 ior, real3 kappa)
     
     real3 Rs2 = (term1 - term2) / (term1 + term2);
     
-    real3 term3 = a2pb2 * incidentCosTheta2 + sinTheta4.xxx;
+    real3 term3 = a2pb2 * incidentCosTheta2.xxx + sinTheta4.xxx;
     real3 term4 = term2 * sinTheta2;
     
     real3 Rp2 = Rs2 * (term3 - term4) / (term3 + term4);
@@ -580,10 +580,10 @@ real smithG1(float3 v, float3 m, real alpha)
     alpha = clamp(alpha, EPSILON, 1.0);
     
     //v.z == Frame::cosTheta
-    //if (dot(v, m) * v.z <= 0.0)
-    //{
-    //     return 0.0;
-    //}
+    if (dot(v, m) * v.z <= 0.0)
+    {
+         return 0.0;
+    }
     
     float tantheta = abs(tanTheta(v));
     if (tantheta <= 0.0) //TODO: almost equal op...
@@ -601,10 +601,10 @@ real smithG1(float3 v, float3 m, real alpha)
 
 float D_GGX(float3 m, real alpha)
 {
-   //if (m.z <= 0.0f)
-    //{
-    //    return 0.0f;
-    //}
+   if (m.z <= 0.0)
+    {
+        return 0.0;
+    }
     alpha = max(EPSILON, alpha);
     
     float costheta2 = cosTheta2(m);
@@ -805,18 +805,18 @@ real3 sample_FGD(float cti, real alpha, real3 ior, real3 kappa)
    
     //remap ranges to 0-1 normalised index.
     const float cti_index = saturate((cti - DimensionXMin) / (DimensionXMax - DimensionXMin));
-    const float alpha_index =  saturate((alpha - DimensionYMin) / (DimensionYMax - DimensionYMin));
+    const float alpha_index = saturate((alpha - DimensionYMin) / (DimensionYMax - DimensionYMin));
     
     //remap Z & W index from being within [0,64] range to [0,2048]
     //Z index is normalised [0,64] range stretched to [0,2048]
-    const float3 ior_norm = (fmod(ior, 4.0) - DimensionZMin) / (DimensionZMax - DimensionZMin);
+    const float3 ior_norm = (ior - DimensionZMin) / (DimensionZMax - DimensionZMin);
     
-    const float3 ior_index = (ior_norm * (DimensionW - 1));
+    const float3 ior_index = (ior_norm * (DimensionZ - 1));
     
     //W index is normalised [0,32] range + Z index.
-    const float3 kappa_norm = (fmod(kappa, 4.0) - DimensionWMin) / (DimensionWMax - DimensionWMin);
+    const float3 kappa_norm = (kappa - DimensionWMin) / (DimensionWMax - DimensionWMin);
     
-    const float3 kappa_index = (kappa_norm * (DimensionZ - 1));
+    const float3 kappa_index = (kappa_norm * (DimensionW - 1));
    
     const float3 ZIndex = (ior_index + kappa_index) / (DimensionZ - 1);
 
@@ -856,7 +856,6 @@ void albedos(float cti, real alpha, real ior_ij, out real3 r_ij, out real3 t_ij,
     
     r_ji = r_ij;
     
-    //somehow this is 0. FGD LUT does have 1.0 values... Possible to hit them??
     t_ij = 1.0.xxx - r_ij; //can't be negative
     t_ji = t_ij;
     

@@ -26,12 +26,12 @@ float3 reflection_energy_tm2(tensor3d2x2 m, float3 cond)
 //computes downward transmission energy for transfer matrix of interface separating 2 media.
 float transmission_energy_tm2(float2x2 m_ij)
 {
-    return safe_div(1.0f, m_ij._11);
+    return safe_div(1.0, m_ij._11);
 }
 
 float3 transmission_energy_tm2(tensor3d2x2 m_ij)
 {
-    return safe_div(1.0f.xxx, m_ij._11);
+    return safe_div(1.0.xxx, m_ij._11);
 }
 
 ///computes dielectric reflected energy for 2 energy matrices.

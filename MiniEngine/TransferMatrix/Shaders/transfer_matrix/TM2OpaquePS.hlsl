@@ -163,15 +163,17 @@ real3 eval_lobe(const sample_record rec, const float3 H, const hg_nomean lobe)
 {
     
 
-    if (lobe.norm.x + lobe.norm.y + lobe.norm.z == 0.0)
+    if (isZero(lobe.norm))
     {
         return 0.0;
     }
     const real rough = hg_to_ggx(lobe.asymmetry);
 #if !defined(USE_EARL_G2) || USE_EARL_G2 == 0
-    const real G2 = smithG(rec.incident, rec.outgoing, H, rough);
-#else
+    const real G2 = G2Correlated(rec.incident, rec.outgoing, rough);
+#elif USE_EARL_G2 == 1
     const real G2 = smithG2(rec.outgoing, H, rec.incident, rough); 
+#elif USE_SMITH_G2 == 1
+    const real G2_0 = smithG(rec.incident, rec.outgoing, H, rough);
 #endif
     
 #if !defined(USE_D_KARIS) || USE_D_KARIS == 0
@@ -180,9 +182,9 @@ real3 eval_lobe(const sample_record rec, const float3 H, const hg_nomean lobe)
     const real3 N = float3(0,0,1);
     const real D = D_GGX_Karis(saturate(dot(N, H)), rough);
 #endif
-    const real3 f = G2 * D / (4.0 * rec.incident.z);
+    const real f = G2 * D / (4.0 * rec.incident.z);
         
-    float3 throughput = lobe.norm * f;
+    real3 throughput = lobe.norm * f;
 
     
     return throughput;
@@ -229,9 +231,10 @@ real3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld, LayerProp
             
 #if SCHLICK_G == 1
                 const real G1 = SchlickG1(incoming, rough);
-#else
+#elif USE_SMITH_G2 == 1
                 const real G1 = smithG1(incoming, H, rough);
-                
+#else
+                const real G1 = G1Correlated(incoming, rough);      
 #endif
                 const real D = D_GGX(H, rough);
             
@@ -261,9 +264,11 @@ real3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld, LayerProp
                 const float3 TopLobeOutgoing = specular_dominant(N, rec.outgoing, saturate(dot(N, rec.incident)), TopRough);
                 const float3 H = normalize(rec.incident + rec.outgoing);
 #if !defined(USE_EARL_G2) || USE_EARL_G2 == 0
+                const real G2_0 = G2Correlated(rec.incident, rec.outgoing, TopRough);
+#elif USE_EARL_G2 == 1
+                const real G2_0 = smithG2(rec.outgoing, H, rec.incident, TopRough);
+#elif USE_SMITH_G2 == 1
                 const real G2_0 = smithG(rec.incident, rec.outgoing, H, TopRough);
-#else
-                const real G2_0 = smithG2(TopLobeOutgoing, H, rec.incident, TopRough);
 #endif
                 
                 const float3 topOutgoingWS = mul(TangentToWorld, MitsubaLSToCartesianTS(TopLobeOutgoing));
@@ -279,7 +284,7 @@ real3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld, LayerProp
                 const real3 ior_01 = props.iors[1] / IOR_AIR;
                 if (isZero(props.kappas[1]))
                 {
-                    F0 = fresnelDielectric(saturate(dot(rec.incident, H)), float3_average(ior_01));
+                    F0 = fresnelDielectric(saturate(dot(rec.incident, H)), float3_average(ior_01)).xxx;
                     //F0 = fresnelDielectric(saturate(dot(rec.incident, H)), ior_01);
                 }
                 else
@@ -288,10 +293,10 @@ real3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld, LayerProp
                 }
 
                 IBLSamples += (TopIBLSample / (real) NumLayers);
-                throughput += ((F0 * G2_0 * D0_0/ (4.0 * rec.incident.z)));
+                throughput += ((F0 * G2_0 * D0_0 / (4.0 * rec.incident.z)));
             }
               
-             //only evaluate layers when not in air-substrate interface.
+             //only evaluate layers when not at air-top interface.
             if (i >= 1)
             {
                 

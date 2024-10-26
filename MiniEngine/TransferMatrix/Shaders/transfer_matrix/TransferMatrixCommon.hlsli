@@ -12,8 +12,6 @@
 #define NUM_SAMPLES 5
 
 #define LAYERS_MAX 5
-#define NUM_LAYERS 2
-#define NUM_LOBES (NUM_LAYERS + 1)
 
 #define NO_SECOND_UV 1
 
@@ -22,7 +20,7 @@
 
 #define IOR_AIR 1.003.xxx
 #define KAPPA_AIR 0.0.xxx
-#define ALPHA_AIR 0.0.xxx
+#define ALPHA_AIR 0.0
 
 
 //Preprocessor switch validations,
@@ -47,38 +45,7 @@ struct sample_record
 };
 
 
-struct LayerProperties
-{
-    real3 iors[LAYERS_MAX];
-    real3 kappas[LAYERS_MAX];
-    real rough[LAYERS_MAX];
-#ifdef TM6
-    real depths[LAYERS_MAX];
-    real3 sigma_s[LAYERS_MAX];
-    real3 sigma_k[LAYERS_MAX];
-    real gs[LAYERS_MAX];
-#endif
-    int NumLayers;
-};
 
-LayerProperties zero_initialise_layers()
-{
-    LayerProperties x;
-    for (int i = 0; i < LAYERS_MAX; i++)
-    {
-        x.iors[i] = 0.0.xxx;
-        x.kappas[i] = 0.0.xxx;
-#ifdef TM6
-         x.sigma_s[i] = 0.0.xxx;
-        x.sigma_k[i] = 0.0.xxx;
-        x.depths[i] = 0.0;
-        x.gs[i] = 0.0;
-#endif
-        x.rough[i] = 0.0;
-    }
-    return x;
-
-}
 
 //Texture Arrays for textured impl.
 //Texture2DArray<float3> TexIORs : register(t0);
@@ -132,6 +99,41 @@ cbuffer LayerParameters : register(b2)
     int NumLayers;
     int NumSamples;
 }
+
+struct LayerProperties
+{
+    real3 iors[LAYERS_MAX];
+    real3 kappas[LAYERS_MAX];
+    real rough[LAYERS_MAX];
+#ifdef TM6
+    real depths[LAYERS_MAX];
+    real3 sigma_s[LAYERS_MAX];
+    real3 sigma_k[LAYERS_MAX];
+    real gs[LAYERS_MAX];
+#endif
+    int NumLayers;
+};
+
+
+LayerProperties zero_initialise_layers()
+{
+    LayerProperties x;
+    for (int i = 0; i < LAYERS_MAX; i++)
+    {
+        x.iors[i] = 0.0.xxx;
+        x.kappas[i] = 0.0.xxx;
+#ifdef TM6
+         x.sigma_s[i] = 0.0.xxx;
+        x.sigma_k[i] = 0.0.xxx;
+        x.depths[i] = 0.0;
+        x.gs[i] = 0.0;
+#endif
+        x.rough[i] = 0.0;
+    }
+    return x;
+
+}
+
 
 cbuffer GlobalConstants : register(b1)
 {
@@ -567,11 +569,55 @@ real smithG1(float NdotV, real alpha)
 //masking-shadowing for G = G1*G2 (incoming and outgoing)
 real smithGCorrelated(real NdotL, real NdotV, real alpha)
 {
+    NdotL = saturate(NdotL);
+    NdotV = saturate(NdotV);
+    
     real alpha2 = alpha * alpha;
     real LambdaV = NdotL * sqrt((-NdotV * alpha2 + NdotV) * NdotV + alpha2);
     real LambdaL = NdotV * sqrt((-NdotL * alpha2 + NdotL) * NdotL + alpha2);
     
     return 0.5 / (LambdaV + LambdaL);
+}
+
+//[Pharr et al 2023]
+real G2Correlated(real3 incident, real3 outgoing, real alpha)
+{
+    real3 H = float3(0, 0, 1);
+    
+    if (dot(incident, H) * incident.z <= 1e-05 || dot(outgoing, H) * outgoing.z <= 1e-05)
+    {
+        return 0.0;
+    }
+    
+    if (tanTheta(incident) <= 1e-05 || tanTheta(outgoing) <= 1e-05)
+    {
+        return 1.0;
+    }
+    
+    
+    real lambdaI = (sqrt(1 + alpha * alpha * tanTheta(incident) * tanTheta(incident)) - 1.0)/2.0;
+    real lambdaO = (sqrt(1 + alpha * alpha * tanTheta(outgoing) * tanTheta(outgoing)) - 1.0) / 2.0;
+    
+    return 1.0 / (1.0 + lambdaO + lambdaI);
+   
+}
+
+real G1Correlated(real3 incident,real alpha)
+{   
+    real3 H = float3(0, 0, 1);
+    if (dot(incident, H) * incident.z <= 1e-05)
+    {
+        return 0.0;
+    }
+    
+    if (tanTheta(incident) <= 1e-05)
+    {
+        return 1.0;
+    }
+    real lambdaI = (sqrt(1 + alpha * alpha * tanTheta(incident) * tanTheta(incident)) - 1.0) / 2.0;
+    
+    return 1.0 / (1.0 + lambdaI);
+   
 }
 
 //assume isotropic
@@ -694,9 +740,11 @@ real TIR_analytical(float cti, real rough, real ior_12, real ior_10)
     real value = 0;
    
     real R = fresnelDielectric(dot(wo, off_specular), ior_12);
-        
-    value += R * smithG1(ws.z, alpha);
-        
+#if USE_SMITH_G2 == 1 
+    value += R * smithG1(ws, normal, alpha);
+#else
+    value += R * G1Correlated(ws, alpha);
+#endif
     value *= (1.0 - fresnelDielectric(wo.z, ior_10)) * step(ws.z, 0.0); //branch elimination, make value 0 if ws.z <= 0 
              
    
@@ -776,7 +824,7 @@ real3 sample_FGD(float cti, real alpha, real3 ior, real3 kappa)
     //Belcour (2020) split sum model for complex IOR.
 
     const real4 coeffsX = fresnel_to_coefficients(ior.x, kappa.x);
-    const real4 coeffsY = fresnel_to_coefficients(ior.z, kappa.y);
+    const real4 coeffsY = fresnel_to_coefficients(ior.y, kappa.y);
     const real4 coeffsZ = fresnel_to_coefficients(ior.z, kappa.z);
     
     real4 splitsum = FGD_Belcour_LUT.Sample(LUTSampler, float2(cti, alpha));

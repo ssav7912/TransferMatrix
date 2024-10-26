@@ -535,7 +535,11 @@ float3 eval_lobe(float3 rec_incident, float3 incident, float3 outgoing, henyey_g
 {
     float3 H = normalize(incident + outgoing);
     const real rough = hg_to_ggx(lobe.asymmetry);
+#if USE_SMITH_G2 == 1
     const real G2 = smithG(incident, outgoing, H, rough);
+#else
+    const real G2 = G2Correlated(incident, outgoing, rough); 
+#endif
     const real D = D_GGX(H, rough);
     
     const float essi = sample_GD(rec_incident.z, rough);
@@ -591,9 +595,10 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
             
 #if SCHLICK_G == 1
             const float G1 = SchlickG1(incoming, rough);
-#else
+#elif USE_SMITH_G2 == 1
             const float G1 = smithG1(incoming, H, rough);
-                
+#else                
+            const float G1 = G1Correlated(incoming, rough);
 #endif
             const float D = D_GGX(H, rough);
             
@@ -634,8 +639,11 @@ float3 sample_preintegrated(sample_record rec, float3x3 TangentToWorld,LayerProp
                 const float3 lobe_outgoing = specular_dominant(N, rec.outgoing, dot(N, lobe_incident[1]), rough);
                 const float3 H = normalize(rec.incident + rec.outgoing); //mirror reflection about normal, 
         
-                
+#if USE_SMITH_G2 == 1         
                 float G2 = smithG(rec.incident, rec.outgoing, H, props.rough[1]);
+#else
+                float G2 = G2Correlated(rec.incident, rec.outgoing, props.rough[1]); 
+#endif
                 float D = D_GGX(H, props.rough[1]);
             
                     //as using preintegrated lighting.

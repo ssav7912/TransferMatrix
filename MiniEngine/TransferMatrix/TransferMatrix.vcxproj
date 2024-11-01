@@ -175,7 +175,8 @@
       <HeaderFileOutput>$(SolutionDir)..\Build\$(Platform)\$(Configuration)\Output\$(ProjectName)\CompiledShaders\%(Filename).h</HeaderFileOutput>
       <ObjectFileOutput />
       <ShaderModel>6.2</ShaderModel>
-      <PreprocessorDefinitions>USE_KARIS_FGD=0; USE_BELCOUR_FGD=1;USEFP16=0; USE_D_KARIS=0;USE_EARL_G2=0; DISABLE_TIR=0;ANALYTIC_TIR=0</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_KARIS_FGD=0; USE_BELCOUR_FGD=1;USEFP16=1; USE_D_KARIS=0;USE_EARL_G2=0;USE_SMITH_G2=1;DISABLE_TIR=0;ANALYTIC_TIR=0;SCHLICK_G=0</PreprocessorDefinitions>
+      <AdditionalOptions>/enable-16bit-types %(AdditionalOptions)</AdditionalOptions>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -199,8 +200,9 @@
       <ShaderModel>6.2</ShaderModel>
       <VariableName>g_p%(Filename)</VariableName>
       <HeaderFileOutput>$(SolutionDir)..\Build\$(Platform)\$(Configuration)\Output\$(ProjectName)\CompiledShaders\%(Filename).h</HeaderFileOutput>
-      <PreprocessorDefinitions>USE_FAST_FGD=0; USEFP16=0; USE_D_KARIS=0;USE_EARL_G2=0; DISABLE_TIR=0;ANALYTIC_TIR=0</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_KARIS_FGD=0; USE_BELCOUR_FGD=1;USEFP16=0; USE_D_KARIS=0;USE_EARL_G2=0;USE_SMITH_G2=1;DISABLE_TIR=0;ANALYTIC_TIR=0;SCHLICK_G=0</PreprocessorDefinitions>
       <EnableDebuggingInformation>true</EnableDebuggingInformation>
+      <AdditionalOptions>/enable-16bit-types %(AdditionalOptions)</AdditionalOptions>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Profile|x64'">
@@ -224,9 +226,10 @@
       <ShaderModel>6.2</ShaderModel>
       <VariableName>g_p%(Filename)</VariableName>
       <HeaderFileOutput>$(SolutionDir)..\Build\$(Platform)\$(Configuration)\Output\$(ProjectName)\CompiledShaders\%(Filename).h</HeaderFileOutput>
-      <PreprocessorDefinitions>USE_KARIS_FGD=0; USE_BELCOUR_FGD=0;USEFP16=0; USE_D_KARIS=0;USE_EARL_G2=0; DISABLE_TIR=0;ANALYTIC_TIR=0;SCHLICK_G=0</PreprocessorDefinitions>
+      <PreprocessorDefinitions>USE_KARIS_FGD=0; USE_BELCOUR_FGD=1;USEFP16=0; USE_D_KARIS=0;USE_EARL_G2=0;USE_SMITH_G2=0;DISABLE_TIR=1;ANALYTIC_TIR=0;SCHLICK_G=0</PreprocessorDefinitions>
       <EnableDebuggingInformation>true</EnableDebuggingInformation>
       <TreatWarningAsError>false</TreatWarningAsError>
+      <AdditionalOptions>/enable-16bit-types %(AdditionalOptions)</AdditionalOptions>
     </FxCompile>
   </ItemDefinitionGroup>
   <ItemGroup>

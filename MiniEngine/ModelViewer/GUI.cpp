@@ -72,8 +72,6 @@ void GUI::LayerUI(int32_t num_layers, int32_t max_layers)
 
 	ImGui::DragInt("Number of Layers", &NumLayers, 1, max_layers);
 	NumLayers = std::max(1, std::min(NumLayers, max_layers));
-	ImGui::DragInt("BSDF Samples", &NumSamples, 1.0f, 1, 100);
-
 	ImGui::Checkbox("Use 6-flux Matrix", &UseTM6);
 
 	ImGui::End();

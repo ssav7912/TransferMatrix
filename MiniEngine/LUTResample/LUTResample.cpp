@@ -19,7 +19,7 @@ int main()
     constexpr size_t TIR_ELEMENTS = TIR_DIM * TIR_DIM * TIR_DIM;
     std::vector<float> TIR_Data (static_cast<size_t>(std::pow(TIR_DIM, TIR_DEPTH)) );
     //std::vector<HALF> Resampled_TIR_Data(sizeof(HALF) * static_cast<size_t>(std::pow(TIR_DIM, TIR_DEPTH)));
-    TransferMatrixResources::LoadLUTFromFile<TIR_DEPTH>("tm_TIR.bin", TIR_Data);
+    TransferMatrixResources::LoadLUTFromFile<TIR_DEPTH>(std::wstring(L"tm_TIR.bin"), TIR_Data);
 
     DirectX::ScratchImage TIR_image{};
     TIR_image.Initialize3D(DXGI_FORMAT_R16_FLOAT, TIR_DIM, TIR_DIM, TIR_DIM, 0);
@@ -42,7 +42,7 @@ int main()
     constexpr size_t FGD_ELEMENTS = FGD_DIM * FGD_DIM * FGD_DIM * FGD_DIM;
 
     std::vector<float> FGD_Data(FGD_ELEMENTS);
-    TransferMatrixResources::LoadLUTFromFile<FGD_DEPTH>("tm_FGD.bin", FGD_Data);
+    TransferMatrixResources::LoadLUTFromFile<FGD_DEPTH>(std::wstring(L"tm_FGD.bin"), FGD_Data);
 
 
     DirectX::ScratchImage FGD_image{};

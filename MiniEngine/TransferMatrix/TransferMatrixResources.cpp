@@ -15,21 +15,24 @@
 #include "TM2OpaquePS.h"
 #include "TM6PS.h"
 
-TransferMatrixResources::TransferMatrixResources(const std::string & FGD_path, const std::string& FGD_Belcour_path, const std::wstring& FGD_4D_path, const std::wstring& GD_path, const std::wstring & TIR_path)
+TransferMatrixResources::TransferMatrixResources(const std::string & FGD_path, const std::string& FGD_Belcour_path, const std::string& FGD_Coeff_path, const std::wstring& FGD_4D_path, const std::wstring& GD_path, const std::wstring & TIR_path)
 {
 
 	//init PSO
-	Initialise(FGD_path, FGD_Belcour_path, FGD_4D_path, GD_path, TIR_path);
+	Initialise(FGD_path, FGD_Belcour_path, FGD_Coeff_path, FGD_4D_path, GD_path, TIR_path);
 
 }
 
-void TransferMatrixResources::Initialise(const std::string& FGD_path, const std::string& FGD_Belcour_path, const std::wstring& FGD_4D_path, const std::wstring& GD_path, const std::wstring& TIR_path)
+void TransferMatrixResources::Initialise(const std::string& FGD_path, const std::string& FGD_Belcour_path, const std::string& FGD_Coeff_path, const std::wstring& FGD_4D_path, const std::wstring& GD_path, const std::wstring& TIR_path)
 {
 
 	auto tex = TextureManager::LoadDDSFromFile(FGD_path);
 	FGD_LUT = tex;
 	auto tex2 = TextureManager::LoadDDSFromFile(FGD_Belcour_path);
 	FGD_Belcour_LUT = tex2;
+
+	auto coefftex = TextureManager::LoadDDSFromFile(FGD_Coeff_path);
+	FGD_Belcour_Coefficients = coefftex; 
 
 	GD_LUT = LoadGDLUTFromFile(GD_path);
 

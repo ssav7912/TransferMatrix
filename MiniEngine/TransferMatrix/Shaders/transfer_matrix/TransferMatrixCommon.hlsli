@@ -34,7 +34,10 @@
 
 #if USE_EARL_G2 == 1 && SCHLICK_G == 1
     #error "Only 1 of USE_EARL_G2 or SCHLICK_G can be enabled, not both!"
+#endif
 
+#if USE_PRECOMPUTED_BELCOUR_COEFFICIENT == 1 && USE_BELCOUR_FGD != 1
+    #error "Precomputed Belcour FGD coefficients must be used with the Belcour FGD LUT. define USE_BELCOUR_FGD=1"
 #endif
 
 
@@ -69,6 +72,11 @@ Texture2D<float2> FGD_LUT : register(t44);
 
 #elif USE_BELCOUR_FGD == 1
 Texture2D<float4> FGD_Belcour_LUT : register(t47);
+
+//for use with belcour FGD, precompute the coefficient function too.
+#if USE_PRECOMPUTED_BELCOUR_COEFFICIENT == 1
+Texture2D<float4> FGD_coeff_Belcour_LUT : register(t48);
+#endif 
 
 #else
 Texture3D<float> FGD_LUT : register(t45);
@@ -757,6 +765,23 @@ real TIR_analytical(float cti, real rough, real ior_12, real ior_10)
 //calculate coefficients for split-sum LUT
 real4 fresnel_to_coefficients(real ior, real kappa)
 {
+    //if using precomputed coefficients just lookup from the LUT rather than doing fresnel evaluations. 
+    #if USE_PRECOMPUTED_BELCOUR_COEFFICIENT == 1   
+    
+    static const float IOR_MAX = 4.0;
+    static const float IOR_MIN = 0.0;
+    static const float KAPPA_MAX = 4.0;
+    static const float KAPPA_MIN = 0.0;
+    
+    
+    //remap ranges to 0-1 normalised index.
+    const float ior_index = saturate((ior - IOR_MIN) / (IOR_MAX - IOR_MIN));
+    const float kappa_index = saturate((kappa- KAPPA_MIN) / (KAPPA_MAX - KAPPA_MIN));
+    
+   
+    real4 coeffs = FGD_coeff_Belcour_LUT.Sample(LUTSampler, float2(ior_index, kappa_index));
+   
+    #else 
     //critical angles used to constrain the basis functions
     static const float ct1 = 0.12812812812812813;
     static const float ct2 = 0.43243243243243246;
@@ -792,7 +817,7 @@ real4 fresnel_to_coefficients(real ior, real kappa)
                           0.67568267, -1.09307669); 
     
     coeffs.zw = mul(coeffs.zw, A);
-    
+    #endif
     return coeffs;
 
 }
@@ -823,17 +848,23 @@ real3 sample_FGD(float cti, real alpha, real3 ior, real3 kappa)
 #elif USE_BELCOUR_FGD == 1
     //Belcour (2020) split sum model for complex IOR.
 
+
+
+    
+    
     const real4 coeffsX = fresnel_to_coefficients(ior.x, kappa.x);
     const real4 coeffsY = fresnel_to_coefficients(ior.y, kappa.y);
     const real4 coeffsZ = fresnel_to_coefficients(ior.z, kappa.z);
     
-    real4 splitsum = FGD_Belcour_LUT.Sample(LUTSampler, float2(cti, alpha));
+real4 splitsum = FGD_Belcour_LUT.Sample(LUTSampler, float2(cti, alpha));
     
     output.x = (coeffsX.x * splitsum.x) + (coeffsX.y * splitsum.y) + (coeffsX.z * splitsum.z) + (coeffsX.w * splitsum.w);
     output.y = (coeffsY.x * splitsum.x) + (coeffsY.y * splitsum.y) + (coeffsY.z * splitsum.z) + (coeffsY.w * splitsum.w);
     output.z = (coeffsZ.x * splitsum.x) + (coeffsZ.y * splitsum.y) + (coeffsZ.z * splitsum.z) + (coeffsZ.w * splitsum.w);
     
+
     return output;
+
     
 #else
     static const uint NumDimensions = 4;

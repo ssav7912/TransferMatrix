@@ -1,9 +1,11 @@
 # Realtime Transfer Matrix Layered Materials 
 An extension of MiniEngine by Team Minigraph at Microsoft
+
 Based on research in the following paper: 
+
 Joël Randrianandrasana, Patrick Callet, and Laurent Lucas. 2021. Transfer matrix based layered materials rendering. ACM Trans. Graph. 40, 4, Article 177 (August 2021), 16 pages. https://doi.org/10.1145/3450626.3459859
 
-  
+See the following repository for thesis, slides and supplementary materials: https://github.com/ssav7912/TransferMatrixSupplementary
 
 ## Getting started:
 * Open ModelViewer/ModelViewer_VS16.sln
@@ -39,6 +41,8 @@ DirectXMesh and DirectXTex are used for compiling content the first time it is l
 
 
 ## Development Notes:
+Majority of the code can be found in the `TransferMatrix/MiniEngine/TransferMatrix/Shaders/` directory. This includes shading models for 2-flux and 6-flux transfer matrices. Most code in the rendering backend is for supporting these shading models. 
+
 A number of preprocessor macros are available for enabling/disabling various features, in order to reproduce experiments. These are:
 ```
 USE_KARIS_FGD=0 //if 1, uses the Karis Split-Sum LUT. Mutually Exclusive with USE_BELCOUR_FGD
